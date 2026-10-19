@@ -1,4 +1,9 @@
-export function formatTaskLabel(task: any): string {
+interface TaskLabelFields {
+  priority?: string | number | boolean | null;
+  owner?: string | number | boolean | null;
+}
+
+export function formatTaskLabel(task: TaskLabelFields | null | undefined): string {
   if (!task) {
     return 'SIN-DATOS';
   }

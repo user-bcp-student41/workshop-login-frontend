@@ -1,0 +1,342 @@
+diff --git "a/artifacts\\before-H06/HALLAZGOS.md" "b/artifacts\\after-H06/HALLAZGOS.md"
+index 0dab5d8..8b0c9ee 100644
+--- "a/artifacts\\before-H06/HALLAZGOS.md"
++++ "b/artifacts\\after-H06/HALLAZGOS.md"
+@@ -1,8 +1,8 @@
+ # Hallazgos — Frontend Angular
+ 
+-Matriz inicial de seguimiento de los seis casos de [RETO.md](./RETO.md), ordenada por severidad. Este es el único documento de seguimiento; las siguientes etapas deben actualizar estas mismas filas e identificadores.
++Matriz de seguimiento de los seis casos de [RETO.md](./RETO.md), ordenada por severidad. Este es el único documento de seguimiento; las siguientes etapas deben actualizar estas mismas filas e identificadores.
+ 
+-Revisión estática del código fuente actual. Las evidencias usan rutas relativas a esta carpeta y líneas verificadas al crear este documento. No se modificó código ni se ejecutaron pruebas, auditorías de dependencias o peticiones a servicios externos. No se usan los informes preexistentes de cobertura como evidencia de una ejecución actual.
++La revisión inicial fue estática y no ejecutó pruebas ni auditorías. Las filas se actualizaron después de cada corrección con sus tests, resultados y diffs locales; el historial de ejecución está en docs/TESTING.md. No se usan informes antiguos como evidencia de una ejecución nueva.
+ 
+ | id | hallazgo | tipo | explicacion | evidencia (archivo:linea) | severidad | estado |
+ |---|---|---|---|---|---|---|
+@@ -11,10 +11,10 @@ Revisión estática del código fuente actual. Las evidencias usan rutas relativ
+ | H-03 | Dependencias: `lodash 4.17.21` y `axios 0.31.0` declarados y utilizados | Sugerencia | Actualizados a Axios 1.20.0/Lodash 4.18.1 con lockfile; consulta pública del 2026-10-19 sin avisos para 27 pares paquete/versión del subárbol instalado. Baseline y corrección: 67 tests verdes, 100% ejecutable, build/tipos y navegador aprobados; no certifica todo el árbol de desarrollo. | [package.json](./package.json); [package-lock.json](./package-lock.json); [artifacts/H-03-runtime-advisories.json](./artifacts/H-03-runtime-advisories.json); [docs/TESTING.md](./docs/TESTING.md); [artifacts/H-03.patch](./artifacts/H-03.patch) | media | Resuelto |
+ | H-04 | Testing: pruebas limitadas a una utilidad | Sugerencia | Resuelto con pruebas de flujo, orden de persistencia, carga pendiente y logout sin HTTP adicional; 39 pruebas verdes y cobertura por archivo >=85%. Navegador: éxito, lista vacía, error 401 y logout verificados; evidencia y límites en docs/TESTING.md, diff local artifacts/H-04.patch. | [src/app/login/login-flow.spec.ts](./src/app/login/login-flow.spec.ts); [vitest.config.ts](./vitest.config.ts); [docs/TESTING.md](./docs/TESTING.md); [artifacts/H-04.patch](./artifacts/H-04.patch) | media | Resuelto |
+ | H-05 | Arquitectura: componentes conocen URLs, HTTP, sesión y navegación | Refactor | Resuelto extrayendo AuthService, TasksService, SessionService, configuración y preparación pura de tareas; componentes conservan UI/navegación. Baseline de 41 y resultado de 55 tests verdes, cobertura ejecutable 100%, build y navegador aprobados; diff local artifacts/H-05.patch. | [src/app/core/auth.service.ts](./src/app/core/auth.service.ts); [src/app/core/tasks.service.ts](./src/app/core/tasks.service.ts); [src/app/core/session.service.ts](./src/app/core/session.service.ts); [src/app/core/task-view.ts](./src/app/core/task-view.ts); [src/environments/environment.ts](./src/environments/environment.ts); [src/app/login/login-flow.spec.ts](./src/app/login/login-flow.spec.ts); [artifacts/H-05.patch](./artifacts/H-05.patch) | baja | Resuelto |
+-| H-06 | Calidad: `any`, condicionales anidados y patrones duplicados | Refactor | Confirmados `any` en estado, respuestas, errores y utilidad; validaciones anidadas en login; y claves de sesión repetidas al escribir, leer y borrar en ambos componentes. También se repite el patrón de extraer el mensaje de error con alternativas, aunque los contratos usan campos diferentes (`message` y `detail`): no son bloques idénticos. Se pierden comprobaciones de tipos y aumenta el riesgo de validaciones o cambios de sesión inconsistentes. | [src/app/login/login.component.ts:16](./src/app/login/login.component.ts#L16); [src/app/login/login.component.ts:33](./src/app/login/login.component.ts#L33); [src/app/login/login.component.ts:36](./src/app/login/login.component.ts#L36); [src/app/login/login.component.ts:47](./src/app/login/login.component.ts#L47); [src/app/login/login.component.ts:55](./src/app/login/login.component.ts#L55); [src/app/dashboard/dashboard.component.ts:23](./src/app/dashboard/dashboard.component.ts#L23); [src/app/dashboard/dashboard.component.ts:36](./src/app/dashboard/dashboard.component.ts#L36); [src/app/dashboard/dashboard.component.ts:67](./src/app/dashboard/dashboard.component.ts#L67); [src/app/dashboard/dashboard.component.ts:75](./src/app/dashboard/dashboard.component.ts#L75); [src/app/utils/legacy-format.ts:1](./src/app/utils/legacy-format.ts#L1) | baja | Pendiente |
++| H-06 | Calidad: `any`, condicionales anidados y patrones duplicados | Refactor | Estado/errores/utilidad tipados, modelos HTTP y defaults opcionales, strict de TS y plantillas; se reutilizan servicios y errores sin duplicación ni anidamiento profundo. Caracterización 69 y resultado 71 tests verdes (100% ejecutable), AST sin any, build/tipos/editor y DOM aprobados. | [tsconfig.json](./tsconfig.json); [models.ts](./src/app/core/models.ts); [legacy-format.spec.ts](./src/app/utils/legacy-format.spec.ts); [login-flow.spec.ts](./src/app/login/login-flow.spec.ts); [docs/TESTING.md](./docs/TESTING.md); [artifacts/H-06.patch](./artifacts/H-06.patch) | baja | Resuelto |
+ 
+-No hay casos completos de RETO marcados como **No encontrado**: los seis tienen evidencia. La aplicabilidad de CVEs y la explotación XSS permanecen sin confirmar y no se contabilizan como hechos demostrados.
++No hay casos completos de RETO marcados como **No encontrado**: los seis tenían evidencia. H-03 documenta ahora avisos por versión y su alcance; no se afirma explotación demostrada en esta app ni un XSS ejecutable previo.
+ 
+ El mapa de componentes, dependencias y el flujo funcional observado se documentan en [docs/ENDPOINTS.md](./docs/ENDPOINTS.md), sin duplicar allí el seguimiento.
+ 
+-Tras H-05, las referencias con línea de los ítems aún pendientes describen la evidencia inicial anterior a la extracción. El token persiste ahora mediante SessionService; Axios y Lodash se mantienen en los servicios. H-01, H-02, H-03 y H-06 no se consideran resueltos por esta reorganización.
++Los seis ítems están resueltos con alcance acotado. La sesión en memoria exige login tras recarga; no elimina el riesgo de scripts maliciosos ya ejecutados en origen. La verificación de dependencias se limita a la fuente, fecha y subárbol documentados, no a toda la cadena de herramientas ni a vulnerabilidades desconocidas.
+diff --git "a/artifacts\\before-H06/docs/TESTING.md" "b/artifacts\\after-H06/docs/TESTING.md"
+index 1fdfcfe..56e6a3b 100644
+--- "a/artifacts\\before-H06/docs/TESTING.md"
++++ "b/artifacts\\after-H06/docs/TESTING.md"
+@@ -266,3 +266,31 @@ Se detuvo solo el servidor de validación propio antes de restaurar. `npm ci --i
+ - TypeScript estricto sobre todos los specs y configuración: salida 0 usando el comando anterior y la lista completa de specs.
+ - Navegador propio 4201 reiniciado con las nuevas dependencias: login y tareas, ARCHIVED oculto, logout; después 401/detail mostrado como error público, detalle privado ausente y logout. Los intentos de click agotaron espera de estabilidad; activación real del botón mediante foco y Enter completó ambos escenarios, sin force ni omitir comprobaciones de estado.
+ - Diff [H-03.patch](../artifacts/H-03.patch); incluye manifiesto y lockfile. H-03 cerrado antes de iniciar H-06.
++
++## H-06: tipado y comprobaciones estrictas
++
++- Baseline: `npm run test:coverage`, salida 0, 67 tests. Se añadieron caracterizaciones de etiquetas con campos vacíos/null y defaults de vista: 69 tests verdes antes de modificar tipos de producción.
++- Después: mismo comando, salida 0, 71 tests verdes; 100% de líneas, sentencias, funciones y ramas ejecutables, manteniendo umbral 85% por archivo. No hay tests omitidos, fallos esperados ni exclusiones nuevas.
++- Componentes usan string/boolean y errores unknown; utilidad con campos opcionales convertibles, modelos propios de credenciales/request/response, GET con owner y arreglo directo. Las preferencias analizadas parten de unknown; no se inventó validación de esquemas ni recuperación silenciosa.
++- Strict de TypeScript y strictTemplates/strictInjectionParameters/strictInputAccessModifiers activados. `npm run build`: salida 0. TypeScript estricto sobre todos los specs y configuración: salida 0. No se activó ignoreDeprecations ni se deshabilitaron gates.
++- El editor detectó opciones obsoletas baseUrl y downlevelIteration. Se retiraron: no hay aliases que dependan de baseUrl y el target ES2022 no necesita downlevelIteration. El build repetido siguió con salida 0; consulta final del editor sin diagnósticos en configuración y archivos cambiados. Se conserva advertencia CommonJS de lodash/merge.
++- Análisis con el parser TypeScript de todos los .ts de producción en src: cero nodos AnyKeyword, salida 0. Se complementa con compilación strict para any implícito, no se basa en buscar la palabra any (expect.any en tests no es un tipo).
++- Los casos de null/undefined de formularios se inyectan con Reflect.set como entradas runtime adversas en el límite del componente; no se usan any, casts dobles ni asignaciones que el nuevo tipo string prohíbe.
++- Prioridad/estado ausentes se reflejan en tipos opcionales. Comparación con prioridad undefined conserva el resultado anterior (1), sin corregir el comparador para prioridades iguales ni inventar jerarquías. Estado ausente se presenta como texto vacío. Casos nuevos verifican esos defaults y ambos sentidos de comparación existentes.
++- Navegador 4201: petición simulada con Strict task/CUSTOM, Default task sin campos y Archived task. DOM mostró tarea, estado desconocido y NORMAL/SIN-ASIGNAR, excluyó archivada y volvió a login al salir. Foco/Enter y Space no activaron el flujo en dos intentos; despacho del evento click al botón completó la verificación Angular/DOM. No se presenta esta última ejecución como test de teclado ni de interacción física.
++- No se modificó la política de mensajes públicos de H-02 ni los endpoints. Diff propio: [H-06.patch](../artifacts/H-06.patch). H-06 cerrado después de las pruebas verdes.
++
++## Estado final de la ejecución de los cuatro pendientes
++
++| Ítem | Caracterización previa | Corrección | Diff propio |
++|---|---|---|---|
++| H-01 | 56 verdes | 58 verdes, navegador y memoria/limpieza | [H-01.patch](../artifacts/H-01.patch) |
++| H-02 | 58 verdes | 67 verdes, texto literal y UI después del error | [H-02.patch](../artifacts/H-02.patch) |
++| H-03 | 67 verdes | 67 verdes, build/tipos, inventario/avisos y navegador | [H-03.patch](../artifacts/H-03.patch) |
++| H-06 | 69 verdes | 71 verdes, build/tipos/AST/editor y DOM | [H-06.patch](../artifacts/H-06.patch) |
++
++Los comandos se ejecutaron desde la raíz del frontend; todas las ejecuciones de caracterización y corrección de la tabla terminaron con salida 0. Las secciones de cada ítem conservan fallos intermedios de instalación e interacción y cómo se resolvieron. No se certificó integración con servicios reales ni se inspeccionaron otros componentes.
++
++Cada patch compara snapshots consecutivos del propio componente, con prefijos before/after dentro de artifacts; los snapshots temporales se eliminan al guardar el patch. Los JSON de avisos son evidencia pública generada, no contienen código ni árbol privado enviado.
++
++docs/ENDPOINTS.md se conserva intacto como contrato HTTP aprobado, aunque contiene el mapa histórico previo a H-05. Las políticas intencionales de memoria y presentación más recientes están descritas aquí y en la matriz. No se hicieron commits.
+diff --git "a/artifacts\\before-H06/src/app/core/auth.service.ts" "b/artifacts\\after-H06/src/app/core/auth.service.ts"
+index 026fe44..48bd3f4 100644
+--- "a/artifacts\\before-H06/src/app/core/auth.service.ts"
++++ "b/artifacts\\after-H06/src/app/core/auth.service.ts"
+@@ -1,14 +1,15 @@
+ import { Injectable } from '@angular/core';
+ import axios from 'axios';
+ import { environment } from '../../environments/environment';
+-import { LoginRequest, LoginResponse } from './models';
++import { LoginCredentials, LoginRequest, LoginResponse } from './models';
+ 
+ @Injectable({ providedIn: 'root' })
+ export class AuthService {
+-  async login(credentials: LoginRequest): Promise<LoginResponse> {
++  async login(credentials: LoginCredentials): Promise<LoginResponse> {
++    const request: LoginRequest = { ...credentials, client: environment.client };
+     const response = await axios.post<LoginResponse>(
+       environment.authUrl,
+-      { ...credentials, client: environment.client },
++      request,
+       { timeout: environment.loginTimeout }
+     );
+     return response.data;
+diff --git "a/artifacts\\before-H06/src/app/core/models.ts" "b/artifacts\\after-H06/src/app/core/models.ts"
+index b156b9d..dffb357 100644
+--- "a/artifacts\\before-H06/src/app/core/models.ts"
++++ "b/artifacts\\after-H06/src/app/core/models.ts"
+@@ -1,8 +1,12 @@
+-export interface LoginRequest {
++export interface LoginCredentials {
+   username: string;
+   password: string;
+ }
+ 
++export interface LoginRequest extends LoginCredentials {
++  client: string;
++}
++
+ export interface SessionUser {
+   username?: string;
+   displayName?: string;
+@@ -22,11 +26,17 @@ export interface Preferences {
+ export interface Task {
+   title?: string;
+   description?: string;
+-  priority: string;
++  priority?: string;
+   owner?: string;
+-  status: string;
++  status?: string;
+ }
+ 
+ export interface TaskView extends Task {
+   label: string;
+ }
++
++export interface TasksRequest {
++  owner: string;
++}
++
++export type TasksResponse = Task[];
+diff --git "a/artifacts\\before-H06/src/app/core/session.service.ts" "b/artifacts\\after-H06/src/app/core/session.service.ts"
+index af02fa1..625cbde 100644
+--- "a/artifacts\\before-H06/src/app/core/session.service.ts"
++++ "b/artifacts\\after-H06/src/app/core/session.service.ts"
+@@ -40,7 +40,7 @@ export class SessionService {
+   getPreferences(): Preferences {
+     const preferences: Preferences = { theme: 'light', showTips: true, compact: false };
+     try {
+-      const saved = JSON.parse(localStorage.getItem(KEYS.preferences) || '{}');
++      const saved: unknown = JSON.parse(localStorage.getItem(KEYS.preferences) || '{}');
+       return merge(preferences, saved);
+     } catch (error) {
+       console.log('Preferences could not be loaded', error);
+diff --git "a/artifacts\\before-H06/src/app/core/task-view.spec.ts" "b/artifacts\\after-H06/src/app/core/task-view.spec.ts"
+index 9acaa11..c989a72 100644
+--- "a/artifacts\\before-H06/src/app/core/task-view.spec.ts"
++++ "b/artifacts\\after-H06/src/app/core/task-view.spec.ts"
+@@ -19,4 +19,19 @@ describe('prepareTaskView', () => {
+       { priority: 'A', status: 'archived', label: 'A · SIN-ASIGNAR' }
+     ]);
+   });
++
++  it('keeps label defaults for a task without optional display fields', () => {
++    expect(prepareTaskView([{ priority: '', status: '' }])).toEqual([
++      { priority: '', status: '', label: 'NORMAL · SIN-ASIGNAR' }
++    ]);
++  });
++
++  it('preserves labels and comparison fallback for missing priority', () => {
++    expect(prepareTaskView([{}, { priority: 'A' }]).map(task => task.label)).toEqual([
++      'NORMAL · SIN-ASIGNAR', 'A · SIN-ASIGNAR'
++    ]);
++    expect(prepareTaskView([{ priority: 'A' }, {}]).map(task => task.label)).toEqual([
++      'A · SIN-ASIGNAR', 'NORMAL · SIN-ASIGNAR'
++    ]);
++  });
+ });
+diff --git "a/artifacts\\before-H06/src/app/core/task-view.ts" "b/artifacts\\after-H06/src/app/core/task-view.ts"
+index ae7a9a4..a0d34ec 100644
+--- "a/artifacts\\before-H06/src/app/core/task-view.ts"
++++ "b/artifacts\\after-H06/src/app/core/task-view.ts"
+@@ -5,5 +5,10 @@ export function prepareTaskView(tasks: Task[]): TaskView[] {
+   return tasks
+     .filter(task => task.status !== 'ARCHIVED')
+     .map(task => ({ ...task, label: formatTaskLabel(task) }))
+-    .sort((a, b) => a.priority > b.priority ? -1 : 1);
++    .sort((a, b) => {
++      if (a.priority === undefined || b.priority === undefined) {
++        return 1;
++      }
++      return a.priority > b.priority ? -1 : 1;
++    });
+ }
+diff --git "a/artifacts\\before-H06/src/app/core/tasks.service.ts" "b/artifacts\\after-H06/src/app/core/tasks.service.ts"
+index 97f7f18..05b85ae 100644
+--- "a/artifacts\\before-H06/src/app/core/tasks.service.ts"
++++ "b/artifacts\\after-H06/src/app/core/tasks.service.ts"
+@@ -1,12 +1,12 @@
+ import { Injectable } from '@angular/core';
+ import axios from 'axios';
+ import { environment } from '../../environments/environment';
+-import { Task } from './models';
++import { TasksRequest, TasksResponse } from './models';
+ 
+ @Injectable({ providedIn: 'root' })
+ export class TasksService {
+-  async load(owner: string, token: string): Promise<Task[]> {
+-    const response = await axios.get<Task[]>(environment.tasksUrl + '?owner=' + owner, {
++  async load(owner: TasksRequest['owner'], token: string): Promise<TasksResponse> {
++    const response = await axios.get<TasksResponse>(environment.tasksUrl + '?owner=' + owner, {
+       headers: { Authorization: 'Bearer ' + token }
+     });
+     return response.data;
+diff --git "a/artifacts\\before-H06/src/app/dashboard/dashboard.component.ts" "b/artifacts\\after-H06/src/app/dashboard/dashboard.component.ts"
+index 80fcc32..a377e19 100644
+--- "a/artifacts\\before-H06/src/app/dashboard/dashboard.component.ts"
++++ "b/artifacts\\after-H06/src/app/dashboard/dashboard.component.ts"
+@@ -26,8 +26,8 @@ export class DashboardComponent implements OnInit {
+   tasks: Task[] = [];
+   visibleTasks: TaskView[] = [];
+   user: SessionUser = {};
+-  loading: any = true;
+-  error: any = '';
++  loading = true;
++  error = '';
+ 
+   constructor(
+     private router: Router,
+@@ -37,8 +37,9 @@ export class DashboardComponent implements OnInit {
+     private taskService: TasksService
+   ) {}
+ 
+-  statusLabel(status: string): string {
+-    return STATUS_LABELS[(status || '').toUpperCase()] || status;
++  statusLabel(status?: string): string {
++    const value = status || '';
++    return STATUS_LABELS[value.toUpperCase()] || value;
+   }
+ 
+   async ngOnInit(): Promise<void> {
+diff --git "a/artifacts\\before-H06/src/app/login/login-flow.spec.ts" "b/artifacts\\after-H06/src/app/login/login-flow.spec.ts"
+index 15373fe..0486697 100644
+--- "a/artifacts\\before-H06/src/app/login/login-flow.spec.ts"
++++ "b/artifacts\\after-H06/src/app/login/login-flow.spec.ts"
+@@ -158,7 +158,7 @@ describe('login and tasks contract', () => {
+ 
+   it.each(['', '   ', null, undefined])('rejects empty username %s without HTTP', async username => {
+     const login = validLogin();
+-    login.username = username;
++    Reflect.set(login, 'username', username);
+     await login.login();
+     expect(login.message).toContain('Ingrese un usuario.');
+     expect(login.busy).toBe(false);
+@@ -168,7 +168,7 @@ describe('login and tasks contract', () => {
+ 
+   it.each(['', '   ', null, undefined])('rejects empty password %s without HTTP', async password => {
+     const login = validLogin();
+-    login.password = password;
++    Reflect.set(login, 'password', password);
+     await login.login();
+     expect(login.message).toContain('Ingrese una contraseña.');
+     expect(axios.post).not.toHaveBeenCalled();
+@@ -274,6 +274,10 @@ describe('login and tasks contract', () => {
+     expect(authenticatedDashboard().statusLabel(status)).toBe(label);
+   });
+ 
++  it('renders an absent status as empty text', () => {
++    expect(authenticatedDashboard().statusLabel(undefined)).toBe('');
++  });
++
+   it('merges saved preferences with defaults', () => {
+     storage.setItem('workshop_preferences', JSON.stringify({ compact: true }));
+     expect(validLogin().preferences).toEqual({ theme: 'light', showTips: true, compact: true });
+diff --git "a/artifacts\\before-H06/src/app/login/login.component.ts" "b/artifacts\\after-H06/src/app/login/login.component.ts"
+index a0cf109..2e4bb49 100644
+--- "a/artifacts\\before-H06/src/app/login/login.component.ts"
++++ "b/artifacts\\after-H06/src/app/login/login.component.ts"
+@@ -15,10 +15,10 @@ import { httpErrorMessage } from '../core/http-error-message';
+   styleUrl: './login.component.css'
+ })
+ export class LoginComponent {
+-  username: any = '';
+-  password: any = '';
+-  busy: any = false;
+-  message: any = '';
++  username = '';
++  password = '';
++  busy = false;
++  message = '';
+   preferences: Preferences;
+ 
+   constructor(
+diff --git "a/artifacts\\before-H06/src/app/utils/legacy-format.spec.ts" "b/artifacts\\after-H06/src/app/utils/legacy-format.spec.ts"
+index 177be13..796b5e3 100644
+--- "a/artifacts\\before-H06/src/app/utils/legacy-format.spec.ts"
++++ "b/artifacts\\after-H06/src/app/utils/legacy-format.spec.ts"
+@@ -17,4 +17,9 @@ describe('formatTaskLabel', () => {
+   it('converts populated values to text', () => {
+     expect(formatTaskLabel({ priority: 2, owner: 42 })).toBe('2 · 42');
+   });
++
++  it('preserves defaults for empty and null fields', () => {
++    expect(formatTaskLabel({ priority: '', owner: null })).toBe('NORMAL · SIN-ASIGNAR');
++    expect(formatTaskLabel({ priority: null, owner: '' })).toBe('NORMAL · SIN-ASIGNAR');
++  });
+ });
+diff --git "a/artifacts\\before-H06/src/app/utils/legacy-format.ts" "b/artifacts\\after-H06/src/app/utils/legacy-format.ts"
+index 64e4e2b..82f4c39 100644
+--- "a/artifacts\\before-H06/src/app/utils/legacy-format.ts"
++++ "b/artifacts\\after-H06/src/app/utils/legacy-format.ts"
+@@ -1,4 +1,9 @@
+-export function formatTaskLabel(task: any): string {
++interface TaskLabelFields {
++  priority?: string | number | boolean | null;
++  owner?: string | number | boolean | null;
++}
++
++export function formatTaskLabel(task: TaskLabelFields | null | undefined): string {
+   if (!task) {
+     return 'SIN-DATOS';
+   }
+diff --git "a/artifacts\\before-H06/tsconfig.json" "b/artifacts\\after-H06/tsconfig.json"
+index 80b42ee..85e3461 100644
+--- "a/artifacts\\before-H06/tsconfig.json"
++++ "b/artifacts\\after-H06/tsconfig.json"
+@@ -1,17 +1,15 @@
+ {
+   "compileOnSave": false,
+   "compilerOptions": {
+-    "baseUrl": "./",
+     "outDir": "./dist/out-tsc",
+     "forceConsistentCasingInFileNames": true,
+-    "strict": false,
++    "strict": true,
+     "noImplicitOverride": false,
+     "noPropertyAccessFromIndexSignature": false,
+     "noImplicitReturns": false,
+     "noFallthroughCasesInSwitch": false,
+     "sourceMap": true,
+     "declaration": false,
+-    "downlevelIteration": true,
+     "experimentalDecorators": true,
+     "moduleResolution": "bundler",
+     "importHelpers": true,
+@@ -22,8 +20,8 @@
+   },
+   "angularCompilerOptions": {
+     "enableI18nLegacyMessageIdFormat": false,
+-    "strictInjectionParameters": false,
+-    "strictInputAccessModifiers": false,
+-    "strictTemplates": false
++    "strictInjectionParameters": true,
++    "strictInputAccessModifiers": true,
++    "strictTemplates": true
+   }
+ }

@@ -1,0 +1,305 @@
+diff --git "a/artifacts\\before-H01/HALLAZGOS.md" "b/artifacts\\after-H01/HALLAZGOS.md"
+index f35c050..a8300e2 100644
+--- "a/artifacts\\before-H01/HALLAZGOS.md"
++++ "b/artifacts\\after-H01/HALLAZGOS.md"
+@@ -6,7 +6,7 @@ Revisión estática del código fuente actual. Las evidencias usan rutas relativ
+ 
+ | id | hallazgo | tipo | explicacion | evidencia (archivo:linea) | severidad | estado |
+ |---|---|---|---|---|---|---|
+-| H-01 | Seguridad: token persistido en `localStorage` | Vulnerabilidad | Confirmado: el token se guarda y luego se lee desde almacenamiento accesible a JavaScript del mismo origen. Si un script malicioso logra ejecutarse en ese origen, puede extraerlo y reutilizarlo; además persiste entre recargas hasta su eliminación. No se ha demostrado una vía de ejecución maliciosa ni la duración del token del servidor. | [src/app/login/login.component.ts:47](./src/app/login/login.component.ts#L47); [src/app/dashboard/dashboard.component.ts:36](./src/app/dashboard/dashboard.component.ts#L36); [src/app/dashboard/dashboard.component.ts:44](./src/app/dashboard/dashboard.component.ts#L44); [src/app/dashboard/dashboard.component.ts:75](./src/app/dashboard/dashboard.component.ts#L75) | alta | Pendiente |
++| H-01 | Seguridad: token persistido en `localStorage` | Vulnerabilidad | Token/usuario solo en memoria, limpieza de claves heredadas y advertencia visible si falla; preferencias conservadas. Baseline 56 y resultado 58 tests verdes, cobertura 100%, navegador con recarga y segundo login/logout; no evita ejecución de scripts maliciosos en origen. | [session.service.ts](./src/app/core/session.service.ts); [session.service.spec.ts](./src/app/core/session.service.spec.ts); [docs/TESTING.md](./docs/TESTING.md); [artifacts/H-01.patch](./artifacts/H-01.patch) | alta | Resuelto |
+ | H-02 | Seguridad: mensaje dinámico renderizado con `[innerHTML]` | Vulnerabilidad | Confirmado: el usuario y el mensaje de error externo se concatenan como HTML. Contenido no confiable puede alterar la presentación del error. Angular sanitiza este enlace por defecto y aquí no se observa una omisión de esa protección; un XSS ejecutable es una hipótesis no demostrada, no un resultado de esta revisión. | [src/app/login/login.component.ts:55](./src/app/login/login.component.ts#L55); [src/app/login/login.component.ts:56](./src/app/login/login.component.ts#L56); [src/app/login/login.component.html:39](./src/app/login/login.component.html#L39) | media | Pendiente |
+ | H-03 | Dependencias: `lodash 4.17.21` y `axios 0.31.0` declarados y utilizados | Sugerencia | Confirmadas las versiones declaradas y el uso de Axios para HTTP y de `lodash/merge` para preferencias locales. Se requiere contrastar avisos de seguridad, versiones efectivamente resueltas y rutas alcanzables antes de decidir actualizar o eliminar. No se atribuye ningún CVE ni vulnerabilidad explotable a estas versiones sin esa verificación; una dependencia afectada y alcanzable podría comprometer el procesamiento de datos o peticiones. | [package.json:19](./package.json#L19); [package.json:20](./package.json#L20); [src/app/login/login.component.ts:5](./src/app/login/login.component.ts#L5); [src/app/login/login.component.ts:25](./src/app/login/login.component.ts#L25); [src/app/dashboard/dashboard.component.ts:43](./src/app/dashboard/dashboard.component.ts#L43) | media | Pendiente |
+ | H-04 | Testing: pruebas limitadas a una utilidad | Sugerencia | Resuelto con pruebas de flujo, orden de persistencia, carga pendiente y logout sin HTTP adicional; 39 pruebas verdes y cobertura por archivo >=85%. Navegador: éxito, lista vacía, error 401 y logout verificados; evidencia y límites en docs/TESTING.md, diff local artifacts/H-04.patch. | [src/app/login/login-flow.spec.ts](./src/app/login/login-flow.spec.ts); [vitest.config.ts](./vitest.config.ts); [docs/TESTING.md](./docs/TESTING.md); [artifacts/H-04.patch](./artifacts/H-04.patch) | media | Resuelto |
+diff --git "a/artifacts\\before-H01/docs/TESTING.md" "b/artifacts\\after-H01/docs/TESTING.md"
+index 1414f0f..d377982 100644
+--- "a/artifacts\\before-H01/docs/TESTING.md"
++++ "b/artifacts\\after-H01/docs/TESTING.md"
+@@ -216,3 +216,14 @@ Estos pasos verifican la inyección real de servicios y actualización de Angula
+ - No se cambió docs/ENDPOINTS.md, URLs, cuerpo, timeout, mensajes ni persistencia. No se agregó timeout a GET, recuperación de JSON corrupto ni invalidación remota. No se actualizaron paquetes ni se activó tipado estricto global.
+ - H-01/H-02/H-03/H-06 continúan pendientes. El bug de JSON de usuario corrupto sigue reportado, no oculto por tests que lo exijan como comportamiento correcto.
+ - Los errores de navegador con retraso del interceptor descritos en H-04 fueron intentos fallidos de simulación, no tests contabilizados como aprobados. La suite final H-05 y sus escenarios de navegador sin demora no tuvieron fallos.
++
++## H-01: sesión exclusivamente en memoria (2026-10-19)
++
++Política confirmada por el usuario: recargar o abrir otra pestaña requiere login. Preferencias permanecen; no hay renovación ni revocación del servidor.
++
++- Antes: se añadió caracterización de token recuperado por una instancia nueva. `npm run test:coverage`: salida 0, 56 tests y cobertura ejecutable 100%.
++- Después: esa expectativa se sustituyó explícitamente por instancia nueva sin sesión, sin escrituras persistentes de token/usuario; se añadieron limpieza heredada y fallo de almacenamiento. Mismo comando: salida 0, 58 tests y 100% de líneas/ramas/funciones/sentencias ejecutables. El snapshot previo en el diff conserva la expectativa anterior.
++- El flujo integrado sigue probando sesión disponible antes de navegar y GET pendiente con Bearer correcto. Error de escritura de preferencias no crea sesión parcial. Limpieza bloqueada: aviso público en login y log sin objeto externo ni secretos, sin romper el constructor.
++- Navegador: en el servidor de validación propio `http://localhost:4201`, login simulado carga Memory task, localStorage no contiene token/usuario y sí preferencias; recarga redirige a login; segundo login y logout aprobados.
++- Intento previo en el servidor ya existente de 4200 falló la comprobación de persistencia. No se atribuyó éxito a ese servidor ni se manipuló su proceso. Se arrancó un servidor desde este componente con `npm start -- --port 4201` y se verificó su respuesta mediante navegador. La herramienta de tareas no admitió crear tarea en esta carpeta; se usó PowerShell. No hubo instalaciones.
++- Directorio de los comandos: raíz de workshop-login-frontend. Diff propio: [H-01.patch](../artifacts/H-01.patch). H-01 cerrado antes de iniciar H-02.
+diff --git "a/artifacts\\before-H01/src/app/core/session.service.spec.ts" "b/artifacts\\after-H01/src/app/core/session.service.spec.ts"
+index a52c4f7..204c8ed 100644
+--- "a/artifacts\\before-H01/src/app/core/session.service.spec.ts"
++++ "b/artifacts\\after-H01/src/app/core/session.service.spec.ts"
+@@ -4,7 +4,7 @@ import { SessionService } from './session.service';
+ 
+ describe('SessionService', () => {
+   let values: Map<string, string>;
+-  const session = new SessionService();
++  let session: SessionService;
+ 
+   beforeEach(() => {
+     values = new Map();
+@@ -13,6 +13,7 @@ describe('SessionService', () => {
+       setItem: vi.fn((key: string, value: string) => { values.set(key, value); }),
+       removeItem: vi.fn((key: string) => { values.delete(key); })
+     });
++    session = new SessionService();
+   });
+   afterEach(() => {
+     vi.restoreAllMocks();
+@@ -25,19 +26,20 @@ describe('SessionService', () => {
+     expect(session.getPreferences()).toEqual({ theme: 'light', showTips: true, compact: false });
+   });
+ 
+-  it('characterizes legacy persistence across service instances before H-01', () => {
+-    session.save('legacy-token', { username: 'student' }, session.getPreferences());
+-    expect(new SessionService().getToken()).toBe('legacy-token');
+-    expect(new SessionService().getUser()).toEqual({ username: 'student' });
++  it('replaces legacy persistence with memory scoped to the service instance', () => {
++    session.save('memory-token', { username: 'student' }, session.getPreferences());
++    expect(session.getToken()).toBe('memory-token');
++    expect(new SessionService().getToken()).toBeNull();
++    expect(new SessionService().getUser()).toEqual({});
++    expect(values.has('workshop_token')).toBe(false);
++    expect(values.has('workshop_user')).toBe(false);
+   });
+ 
+-  it('saves in the existing order and clears only token and user', () => {
++  it('persists only preferences and clears the memory session', () => {
+     const user = { username: 'student' };
+     const preferences = { theme: 'light', showTips: false, compact: true };
+     session.save('unit-token', user, preferences);
+     expect(vi.mocked(localStorage.setItem).mock.calls).toEqual([
+-      ['workshop_token', 'unit-token'],
+-      ['workshop_user', JSON.stringify(user)],
+       ['workshop_preferences', JSON.stringify(preferences)]
+     ]);
+     expect(session.getToken()).toBe('unit-token');
+@@ -64,5 +66,32 @@ describe('SessionService', () => {
+     const error = new Error('Storage unavailable');
+     vi.mocked(localStorage.setItem).mockImplementation(() => { throw error; });
+     expect(() => session.save('token', {}, session.getPreferences())).toThrow(error);
++    expect(session.getToken()).toBeNull();
++    expect(session.getUser()).toEqual({});
++  });
++
++  it('removes legacy session keys without touching preferences', () => {
++    values.set('workshop_token', 'legacy-token');
++    values.set('workshop_user', '{corrupt');
++    values.set('workshop_preferences', '{"compact":true}');
++    const fresh = new SessionService();
++    expect(fresh.getToken()).toBeNull();
++    expect(fresh.getUser()).toEqual({});
++    expect(values.has('workshop_token')).toBe(false);
++    expect(values.has('workshop_user')).toBe(false);
++    expect(fresh.getPreferences().compact).toBe(true);
++  });
++
++  it('reports blocked cleanup without leaking data or retaining an active session', () => {
++    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
++    vi.mocked(localStorage.removeItem).mockImplementation(() => { throw new Error('secret'); });
++    const fresh = new SessionService();
++    expect(fresh.storageWarning).not.toBe('');
++    expect(log).toHaveBeenCalledWith('Legacy session cleanup failed');
++    expect(JSON.stringify(log.mock.calls)).not.toContain('secret');
++    fresh.save('private-token', {}, fresh.getPreferences());
++    fresh.clear();
++    expect(fresh.getToken()).toBeNull();
++    expect(fresh.storageWarning).not.toBe('');
+   });
+ });
+diff --git "a/artifacts\\before-H01/src/app/core/session.service.ts" "b/artifacts\\after-H01/src/app/core/session.service.ts"
+index 83cb9ac..af02fa1 100644
+--- "a/artifacts\\before-H01/src/app/core/session.service.ts"
++++ "b/artifacts\\after-H01/src/app/core/session.service.ts"
+@@ -10,12 +10,31 @@ const KEYS = {
+ 
+ @Injectable({ providedIn: 'root' })
+ export class SessionService {
++  private token: string | null = null;
++  private user: SessionUser = {};
++  storageWarning = '';
++
++  constructor() {
++    this.removeLegacySession();
++  }
++
++  private removeLegacySession(): void {
++    this.storageWarning = '';
++    try {
++      localStorage.removeItem(KEYS.token);
++      localStorage.removeItem(KEYS.user);
++    } catch {
++      this.storageWarning = 'No se pudieron eliminar los datos de sesión anteriores del navegador.';
++      console.error('Legacy session cleanup failed');
++    }
++  }
++
+   getToken(): string | null {
+-    return localStorage.getItem(KEYS.token);
++    return this.token;
+   }
+ 
+   getUser(): SessionUser {
+-    return JSON.parse(localStorage.getItem(KEYS.user) || '{}');
++    return this.user;
+   }
+ 
+   getPreferences(): Preferences {
+@@ -30,13 +49,14 @@ export class SessionService {
+   }
+ 
+   save(token: string, user: SessionUser, preferences: Preferences): void {
+-    localStorage.setItem(KEYS.token, token);
+-    localStorage.setItem(KEYS.user, JSON.stringify(user));
+     localStorage.setItem(KEYS.preferences, JSON.stringify(preferences));
++    this.token = token;
++    this.user = user;
+   }
+ 
+   clear(): void {
+-    localStorage.removeItem(KEYS.token);
+-    localStorage.removeItem(KEYS.user);
++    this.token = null;
++    this.user = {};
++    this.removeLegacySession();
+   }
+ }
+diff --git "a/artifacts\\before-H01/src/app/login/component-services.spec.ts" "b/artifacts\\after-H01/src/app/login/component-services.spec.ts"
+index 7a47d87..cf06d3a 100644
+--- "a/artifacts\\before-H01/src/app/login/component-services.spec.ts"
++++ "b/artifacts\\after-H01/src/app/login/component-services.spec.ts"
+@@ -2,7 +2,7 @@ import '@angular/compiler';
+ import 'zone.js';
+ import { ChangeDetectorRef, NgZone } from '@angular/core';
+ import { Router } from '@angular/router';
+-import { afterEach, describe, expect, it, vi } from 'vitest';
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+ import { AuthService } from '../core/auth.service';
+ import { SessionService } from '../core/session.service';
+ import { TasksService } from '../core/tasks.service';
+@@ -14,7 +14,13 @@ vi.mock('@angular/router', () => ({
+ }));
+ 
+ describe('component service boundaries', () => {
+-  afterEach(() => vi.restoreAllMocks());
++  beforeEach(() => {
++    vi.stubGlobal('localStorage', { removeItem: vi.fn() });
++  });
++  afterEach(() => {
++    vi.restoreAllMocks();
++    vi.unstubAllGlobals();
++  });
+ 
+   it('lets login orchestrate mocked services and navigation without storage access', async () => {
+     const session = new SessionService();
+diff --git "a/artifacts\\before-H01/src/app/login/login-flow.spec.ts" "b/artifacts\\after-H01/src/app/login/login-flow.spec.ts"
+index 5169e12..8d73763 100644
+--- "a/artifacts\\before-H01/src/app/login/login-flow.spec.ts"
++++ "b/artifacts\\after-H01/src/app/login/login-flow.spec.ts"
+@@ -45,7 +45,7 @@ describe('login and tasks contract', () => {
+   const zone = new NgZone({ enableLongStackTrace: false });
+   let storage: MemoryStorage;
+   const auth = new AuthService();
+-  const session = new SessionService();
++  let session: SessionService;
+   const tasksService = new TasksService();
+ 
+   function createDashboard(): DashboardComponent {
+@@ -53,8 +53,7 @@ describe('login and tasks contract', () => {
+   }
+ 
+   function authenticatedDashboard(): DashboardComponent {
+-    storage.setItem('workshop_token', 'test-token');
+-    storage.setItem('workshop_user', JSON.stringify(user));
++    session.save('test-token', user, session.getPreferences());
+     return createDashboard();
+   }
+ 
+@@ -69,6 +68,7 @@ describe('login and tasks contract', () => {
+     vi.resetAllMocks();
+     storage = new MemoryStorage();
+     vi.stubGlobal('localStorage', storage);
++    session = new SessionService();
+     navigate.mockResolvedValue(true);
+     vi.spyOn(console, 'error').mockImplementation(() => {});
+     vi.spyOn(console, 'log').mockImplementation(() => {});
+@@ -88,8 +88,10 @@ describe('login and tasks contract', () => {
+       { username: 'student', password: 'test-password', client: 'angular-workshop' },
+       { timeout: 5000 }
+     );
+-    expect(storage.getItem('workshop_token')).toBe('test-token');
+-    expect(storage.getItem('workshop_user')).toBe(JSON.stringify(user));
++    expect(session.getToken()).toBe('test-token');
++    expect(session.getUser()).toEqual(user);
++    expect(storage.getItem('workshop_token')).toBeNull();
++    expect(storage.getItem('workshop_user')).toBeNull();
+     expect(navigate).toHaveBeenLastCalledWith(['/dashboard']);
+     expect(login.busy).toBe(false);
+     const preferences = storage.getItem('workshop_preferences');
+@@ -114,6 +116,7 @@ describe('login and tasks contract', () => {
+     expect(dashboard.error).toBe('');
+     expect(detectChanges).toHaveBeenCalledOnce();
+     await dashboard.logout();
++    expect(session.getToken()).toBeNull();
+     expect(storage.getItem('workshop_token')).toBeNull();
+     expect(storage.getItem('workshop_user')).toBeNull();
+     expect(storage.getItem('workshop_preferences')).toBe(preferences);
+@@ -123,8 +126,8 @@ describe('login and tasks contract', () => {
+   it('persists before navigation, waits for tasks and logs out without additional HTTP', async () => {
+     navigate.mockImplementation(async commands => {
+       if (commands[0] === '/dashboard') {
+-        expect(storage.getItem('workshop_token')).toBe('test-token');
+-        expect(storage.getItem('workshop_user')).toBe(JSON.stringify(user));
++        expect(session.getToken()).toBe('test-token');
++        expect(session.getUser()).toEqual(user);
+         expect(storage.getItem('workshop_preferences')).not.toBeNull();
+         expect(axios.get).not.toHaveBeenCalled();
+       }
+@@ -134,7 +137,7 @@ describe('login and tasks contract', () => {
+     await validLogin().login();
+     let complete!: (response: { data: [] }) => void;
+     vi.mocked(axios.get).mockImplementation(() => {
+-      expect(storage.getItem('workshop_token')).toBe('test-token');
++      expect(session.getToken()).toBe('test-token');
+       return new Promise(resolve => { complete = resolve; });
+     });
+     const dashboard = createDashboard();
+@@ -232,7 +235,7 @@ describe('login and tasks contract', () => {
+   });
+ 
+   it('handles an empty task list and absent username', async () => {
+-    storage.setItem('workshop_token', 'test-token');
++    session.save('test-token', {}, session.getPreferences());
+     vi.mocked(axios.get).mockResolvedValue({ data: [] });
+     const dashboard = createDashboard();
+     await dashboard.ngOnInit();
+diff --git "a/artifacts\\before-H01/src/app/login/login.component.html" "b/artifacts\\after-H01/src/app/login/login.component.html"
+index f0009b1..3e47494 100644
+--- "a/artifacts\\before-H01/src/app/login/login.component.html"
++++ "b/artifacts\\after-H01/src/app/login/login.component.html"
+@@ -36,6 +36,7 @@
+       {{ busy ? 'Ingresando...' : 'Ingresar' }}
+     </button>
+ 
++    <p role="status" *ngIf="session.storageWarning">{{ session.storageWarning }}</p>
+     <div class="message" *ngIf="message" [innerHTML]="message"></div>
+ 
+     <small>Laboratorio local. No utilices credenciales reales.</small>
+diff --git "a/artifacts\\before-H01/src/app/login/login.component.ts" "b/artifacts\\after-H01/src/app/login/login.component.ts"
+index 61cf234..a3c757a 100644
+--- "a/artifacts\\before-H01/src/app/login/login.component.ts"
++++ "b/artifacts\\after-H01/src/app/login/login.component.ts"
+@@ -23,7 +23,7 @@ export class LoginComponent {
+   constructor(
+     private router: Router,
+     private auth: AuthService,
+-    private session: SessionService
++    public session: SessionService
+   ) {
+     this.preferences = this.session.getPreferences();
+   }

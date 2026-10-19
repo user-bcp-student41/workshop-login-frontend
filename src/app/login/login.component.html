@@ -36,7 +36,8 @@
       {{ busy ? 'Ingresando...' : 'Ingresar' }}
     </button>
 
-    <div class="message" *ngIf="message" [innerHTML]="message"></div>
+    <p role="status" *ngIf="session.storageWarning">{{ session.storageWarning }}</p>
+    <div class="message" role="alert" *ngIf="message">{{ message }}</div>
 
     <small>Laboratorio local. No utilices credenciales reales.</small>
   </section>

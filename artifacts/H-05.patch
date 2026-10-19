@@ -1,0 +1,739 @@
+diff --git "a/artifacts\\baseline-H05/HALLAZGOS.md" "b/artifacts\\after-H05/HALLAZGOS.md"
+index 086903d..f35c050 100644
+--- "a/artifacts\\baseline-H05/HALLAZGOS.md"
++++ "b/artifacts\\after-H05/HALLAZGOS.md"
+@@ -10,9 +10,11 @@ Revisión estática del código fuente actual. Las evidencias usan rutas relativ
+ | H-02 | Seguridad: mensaje dinámico renderizado con `[innerHTML]` | Vulnerabilidad | Confirmado: el usuario y el mensaje de error externo se concatenan como HTML. Contenido no confiable puede alterar la presentación del error. Angular sanitiza este enlace por defecto y aquí no se observa una omisión de esa protección; un XSS ejecutable es una hipótesis no demostrada, no un resultado de esta revisión. | [src/app/login/login.component.ts:55](./src/app/login/login.component.ts#L55); [src/app/login/login.component.ts:56](./src/app/login/login.component.ts#L56); [src/app/login/login.component.html:39](./src/app/login/login.component.html#L39) | media | Pendiente |
+ | H-03 | Dependencias: `lodash 4.17.21` y `axios 0.31.0` declarados y utilizados | Sugerencia | Confirmadas las versiones declaradas y el uso de Axios para HTTP y de `lodash/merge` para preferencias locales. Se requiere contrastar avisos de seguridad, versiones efectivamente resueltas y rutas alcanzables antes de decidir actualizar o eliminar. No se atribuye ningún CVE ni vulnerabilidad explotable a estas versiones sin esa verificación; una dependencia afectada y alcanzable podría comprometer el procesamiento de datos o peticiones. | [package.json:19](./package.json#L19); [package.json:20](./package.json#L20); [src/app/login/login.component.ts:5](./src/app/login/login.component.ts#L5); [src/app/login/login.component.ts:25](./src/app/login/login.component.ts#L25); [src/app/dashboard/dashboard.component.ts:43](./src/app/dashboard/dashboard.component.ts#L43) | media | Pendiente |
+ | H-04 | Testing: pruebas limitadas a una utilidad | Sugerencia | Resuelto con pruebas de flujo, orden de persistencia, carga pendiente y logout sin HTTP adicional; 39 pruebas verdes y cobertura por archivo >=85%. Navegador: éxito, lista vacía, error 401 y logout verificados; evidencia y límites en docs/TESTING.md, diff local artifacts/H-04.patch. | [src/app/login/login-flow.spec.ts](./src/app/login/login-flow.spec.ts); [vitest.config.ts](./vitest.config.ts); [docs/TESTING.md](./docs/TESTING.md); [artifacts/H-04.patch](./artifacts/H-04.patch) | media | Resuelto |
+-| H-05 | Arquitectura: componentes conocen URLs, HTTP, sesión y navegación | Refactor | Confirmado: login autentica, persiste sesión y navega; dashboard recupera sesión, consulta HTTP, transforma tareas y cierra sesión. URLs y claves de almacenamiento están incrustadas en esos componentes. Cambiar el contrato o la sesión exige cambios coordinados y dificulta probar cada responsabilidad de manera aislada. | [src/app/login/login.component.ts:41](./src/app/login/login.component.ts#L41); [src/app/login/login.component.ts:47](./src/app/login/login.component.ts#L47); [src/app/login/login.component.ts:50](./src/app/login/login.component.ts#L50); [src/app/dashboard/dashboard.component.ts:36](./src/app/dashboard/dashboard.component.ts#L36); [src/app/dashboard/dashboard.component.ts:43](./src/app/dashboard/dashboard.component.ts#L43); [src/app/dashboard/dashboard.component.ts:74](./src/app/dashboard/dashboard.component.ts#L74) | baja | Pendiente |
++| H-05 | Arquitectura: componentes conocen URLs, HTTP, sesión y navegación | Refactor | Resuelto extrayendo AuthService, TasksService, SessionService, configuración y preparación pura de tareas; componentes conservan UI/navegación. Baseline de 41 y resultado de 55 tests verdes, cobertura ejecutable 100%, build y navegador aprobados; diff local artifacts/H-05.patch. | [src/app/core/auth.service.ts](./src/app/core/auth.service.ts); [src/app/core/tasks.service.ts](./src/app/core/tasks.service.ts); [src/app/core/session.service.ts](./src/app/core/session.service.ts); [src/app/core/task-view.ts](./src/app/core/task-view.ts); [src/environments/environment.ts](./src/environments/environment.ts); [src/app/login/login-flow.spec.ts](./src/app/login/login-flow.spec.ts); [artifacts/H-05.patch](./artifacts/H-05.patch) | baja | Resuelto |
+ | H-06 | Calidad: `any`, condicionales anidados y patrones duplicados | Refactor | Confirmados `any` en estado, respuestas, errores y utilidad; validaciones anidadas en login; y claves de sesión repetidas al escribir, leer y borrar en ambos componentes. También se repite el patrón de extraer el mensaje de error con alternativas, aunque los contratos usan campos diferentes (`message` y `detail`): no son bloques idénticos. Se pierden comprobaciones de tipos y aumenta el riesgo de validaciones o cambios de sesión inconsistentes. | [src/app/login/login.component.ts:16](./src/app/login/login.component.ts#L16); [src/app/login/login.component.ts:33](./src/app/login/login.component.ts#L33); [src/app/login/login.component.ts:36](./src/app/login/login.component.ts#L36); [src/app/login/login.component.ts:47](./src/app/login/login.component.ts#L47); [src/app/login/login.component.ts:55](./src/app/login/login.component.ts#L55); [src/app/dashboard/dashboard.component.ts:23](./src/app/dashboard/dashboard.component.ts#L23); [src/app/dashboard/dashboard.component.ts:36](./src/app/dashboard/dashboard.component.ts#L36); [src/app/dashboard/dashboard.component.ts:67](./src/app/dashboard/dashboard.component.ts#L67); [src/app/dashboard/dashboard.component.ts:75](./src/app/dashboard/dashboard.component.ts#L75); [src/app/utils/legacy-format.ts:1](./src/app/utils/legacy-format.ts#L1) | baja | Pendiente |
+ 
+ No hay casos completos de RETO marcados como **No encontrado**: los seis tienen evidencia. La aplicabilidad de CVEs y la explotación XSS permanecen sin confirmar y no se contabilizan como hechos demostrados.
+ 
+ El mapa de componentes, dependencias y el flujo funcional observado se documentan en [docs/ENDPOINTS.md](./docs/ENDPOINTS.md), sin duplicar allí el seguimiento.
++
++Tras H-05, las referencias con línea de los ítems aún pendientes describen la evidencia inicial anterior a la extracción. El token persiste ahora mediante SessionService; Axios y Lodash se mantienen en los servicios. H-01, H-02, H-03 y H-06 no se consideran resueltos por esta reorganización.
+diff --git "a/artifacts\\baseline-H05/docs/TESTING.md" "b/artifacts\\after-H05/docs/TESTING.md"
+index d8f4225..1414f0f 100644
+--- "a/artifacts\\baseline-H05/docs/TESTING.md"
++++ "b/artifacts\\after-H05/docs/TESTING.md"
+@@ -160,3 +160,59 @@ Prueba de regresión propuesta, aún no implementada: con JSON corrupto, la inic
+ - Se observó el botón Ingresando deshabilitado mientras la respuesta estaba pendiente. Dos intentos de añadir demora mediante temporizador dentro del interceptor no completaron a tiempo y el POST fue abortado; esos intentos no se contabilizan como éxito de login. Los escenarios completos anteriores se ejecutaron sin temporizador en el interceptor. No se atribuye esa limitación de la simulación al backend.
+ - Procedimiento reproducible: interceptar POST con token ficticio y usuario Browser Student, GET con tarea visible/ARCHIVED; introducir credenciales ficticias y comprobar DOM y logout; repetir GET con arreglo vacío y con HTTP 401/detail. Para observar botón pendiente, mantener pendiente la respuesta de POST y comprobar `disabled`, sin afirmar temporización real de red.
+ - No se modificó producción. Se cerró H-04 antes de iniciar H-05. El patch de H-04 incluye el archivo de flujo completo por ser un archivo previamente no rastreado; sus 33 casos anteriores no se presentan como trabajo nuevo de esta etapa.
++
++## Implementación aprobada: H-05 (2026-10-19)
++
++Esta sección es la evidencia vigente después de la extracción; las secciones anteriores conservan el historial anterior al refactor.
++
++### Caracterización antes y después
++
++Antes de modificar producción se añadieron dos variantes de orden de prioridades (`A,B` y `B,A`) a la suite integrada. `npm run test:coverage` terminó con salida 0: 41 tests verdes y 100% en las cuatro métricas sobre los dos componentes y utilidad. Se preservaron los casos de H-04, incluyendo sesión antes de navegar, carga pendiente y logout sin HTTP.
++
++Después se adaptó esa misma suite para construir AuthService, TasksService y SessionService reales, con Axios y almacenamiento simulados. No se reemplazó por una prueba donde todos los servicios estuvieran simulados. Los tests de componentes con servicios simulados se mantienen separados.
++
++| Prueba de corrección | Archivo | Resultado final |
++|---|---|---|
++| Contrato POST exacto y propagación del error original | [auth.service.spec.ts](../src/app/core/auth.service.spec.ts) | 2 verdes |
++| GET directo, owner normal/vacío, Bearer y rechazo de token | [tasks.service.spec.ts](../src/app/core/tasks.service.spec.ts) | 3 verdes |
++| Defaults, orden de escritura, persistencia, logout, merge y fallo de almacenamiento | [session.service.spec.ts](../src/app/core/session.service.spec.ts) | 4 verdes |
++| Transformación pura, ambos sentidos del orden, no mutación y ARCHIVED exacto | [task-view.spec.ts](../src/app/core/task-view.spec.ts) | 3 verdes |
++| Componentes con dobles de servicios, sin HTTP/almacenamiento directo | [component-services.spec.ts](../src/app/login/component-services.spec.ts) | 2 verdes |
++| Contratos y flujo conectado mediante servicios reales | [login-flow.spec.ts](../src/app/login/login-flow.spec.ts) | 36 verdes |
++| Etiqueta y defaults | [legacy-format.spec.ts](../src/app/utils/legacy-format.spec.ts) | 5 verdes |
++
++### Ejecuciones reales desde la raíz del componente
++
++Directorio: `C:\Users\Usuario\Documents\T56628-junior-cabrera\reqflow-workspace\workshop-login-frontend`.
++
++| Comando | Salida | Resultado |
++|---|---|---|
++| `npm run test:coverage` antes de H-05 | 0 | 41 tests verdes, 100% en las cuatro métricas |
++| `npm run test:coverage` después de H-05 | 0 | 7 archivos, 55 tests verdes; sin omitidos ni fallos esperados |
++| `npm run build` | 0 | Bundle generado; advertencias CommonJS de Axios y lodash/merge conservadas, no silenciadas |
++| Comando TypeScript debajo | 0 | Sin errores de tipado estricto en tests, configuración y dependencias de código importadas |
++
++```powershell
++npx --no-install tsc --noEmit --strict --experimentalDecorators --moduleResolution bundler --module ES2022 --target ES2022 --skipLibCheck src\app\login\login-flow.spec.ts src\app\login\component-services.spec.ts src\app\core\auth.service.spec.ts src\app\core\tasks.service.spec.ts src\app\core\session.service.spec.ts src\app\core\task-view.spec.ts src\app\utils\legacy-format.spec.ts vitest.config.ts
++```
++
++Cobertura final: 100% de líneas, sentencias, funciones y ramas en todos los archivos de producción ejecutables incluidos: componentes login/dashboard, servicios auth/tasks/session, task-view, legacy-format y environment. El denominador se amplió para incluir los archivos extraídos sin reducir los umbrales por archivo del 85%. `models.ts` solo contiene interfaces borradas en compilación: V8 lo lista con ceros sin sentencias/ramas/funciones ejecutables; no se interpreta como lógica sin probar ni se excluye para subir cobertura.
++
++### Navegador después de H-05
++
++Se recargó la aplicación servida en localhost:4200 y se repitieron interceptores sin temporizador. Resultados realmente observados:
++
++- POST simulado válido: navegación, saludo y tarea visibles; ARCHIVED no aparece; logout vuelve a login.
++- GET con arreglo vacío: mensaje de lista vacía visible.
++- GET con HTTP 401/detail: error visible, permanece en dashboard, logout vuelve a login.
++
++Estos pasos verifican la inyección real de servicios y actualización de Angular después de navegar. Los tests de Node no se presentan como sustituto de esas comprobaciones.
++
++### Diffs y límites conservados
++
++- [H-04.patch](../artifacts/H-04.patch): snapshot de la entrega de pruebas, documentación y cierre de H-04 antes de H-05; incluye el archivo de flujo previamente no rastreado.
++- [H-05.patch](../artifacts/H-05.patch): delta respecto al snapshot tomado después de cerrar H-04, no respecto a main. Los prefijos internos `artifacts/baseline-H05` y `artifacts/after-H05` indican los dos lados de la comparación; no son carpetas de producción.
++- La función de vista ya no añade label a los objetos originales: produce copias para visibleTasks. La lista original permanece completa; el filtrado, orden y renderizado se mantienen.
++- No se cambió docs/ENDPOINTS.md, URLs, cuerpo, timeout, mensajes ni persistencia. No se agregó timeout a GET, recuperación de JSON corrupto ni invalidación remota. No se actualizaron paquetes ni se activó tipado estricto global.
++- H-01/H-02/H-03/H-06 continúan pendientes. El bug de JSON de usuario corrupto sigue reportado, no oculto por tests que lo exijan como comportamiento correcto.
++- Los errores de navegador con retraso del interceptor descritos en H-04 fueron intentos fallidos de simulación, no tests contabilizados como aprobados. La suite final H-05 y sus escenarios de navegador sin demora no tuvieron fallos.
+diff --git "a/artifacts\\after-H05/src/app/core/auth.service.spec.ts" "b/artifacts\\after-H05/src/app/core/auth.service.spec.ts"
+new file mode 100644
+index 0000000..46062dd
+--- /dev/null
++++ "b/artifacts\\after-H05/src/app/core/auth.service.spec.ts"
+@@ -0,0 +1,25 @@
++import '@angular/compiler';
++import axios from 'axios';
++import { describe, expect, it, vi, afterEach } from 'vitest';
++import { AuthService } from './auth.service';
++
++describe('AuthService', () => {
++  afterEach(() => vi.restoreAllMocks());
++
++  it('sends the exact login contract and returns the unwrapped data', async () => {
++    const data = { token: 'unit-token', user: { username: 'student' } };
++    const post = vi.spyOn(axios, 'post').mockResolvedValue({ data });
++    expect(await new AuthService().login({ username: ' student ', password: ' pass ' })).toBe(data);
++    expect(post).toHaveBeenCalledExactlyOnceWith(
++      'http://localhost:8080/auth/login',
++      { username: ' student ', password: ' pass ', client: 'angular-workshop' },
++      { timeout: 5000 }
++    );
++  });
++
++  it('propagates the original error without navigation or a success fallback', async () => {
++    const error = new Error('Network Error');
++    vi.spyOn(axios, 'post').mockRejectedValue(error);
++    await expect(new AuthService().login({ username: 'student', password: 'pass' })).rejects.toBe(error);
++  });
++});
+diff --git "a/artifacts\\after-H05/src/app/core/auth.service.ts" "b/artifacts\\after-H05/src/app/core/auth.service.ts"
+new file mode 100644
+index 0000000..026fe44
+--- /dev/null
++++ "b/artifacts\\after-H05/src/app/core/auth.service.ts"
+@@ -0,0 +1,16 @@
++import { Injectable } from '@angular/core';
++import axios from 'axios';
++import { environment } from '../../environments/environment';
++import { LoginRequest, LoginResponse } from './models';
++
++@Injectable({ providedIn: 'root' })
++export class AuthService {
++  async login(credentials: LoginRequest): Promise<LoginResponse> {
++    const response = await axios.post<LoginResponse>(
++      environment.authUrl,
++      { ...credentials, client: environment.client },
++      { timeout: environment.loginTimeout }
++    );
++    return response.data;
++  }
++}
+diff --git "a/artifacts\\after-H05/src/app/core/models.ts" "b/artifacts\\after-H05/src/app/core/models.ts"
+new file mode 100644
+index 0000000..b156b9d
+--- /dev/null
++++ "b/artifacts\\after-H05/src/app/core/models.ts"
+@@ -0,0 +1,32 @@
++export interface LoginRequest {
++  username: string;
++  password: string;
++}
++
++export interface SessionUser {
++  username?: string;
++  displayName?: string;
++}
++
++export interface LoginResponse {
++  token?: string;
++  user: SessionUser;
++}
++
++export interface Preferences {
++  theme: string;
++  showTips: boolean;
++  compact: boolean;
++}
++
++export interface Task {
++  title?: string;
++  description?: string;
++  priority: string;
++  owner?: string;
++  status: string;
++}
++
++export interface TaskView extends Task {
++  label: string;
++}
+diff --git "a/artifacts\\after-H05/src/app/core/session.service.spec.ts" "b/artifacts\\after-H05/src/app/core/session.service.spec.ts"
+new file mode 100644
+index 0000000..3832b49
+--- /dev/null
++++ "b/artifacts\\after-H05/src/app/core/session.service.spec.ts"
+@@ -0,0 +1,62 @@
++import '@angular/compiler';
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++import { SessionService } from './session.service';
++
++describe('SessionService', () => {
++  let values: Map<string, string>;
++  const session = new SessionService();
++
++  beforeEach(() => {
++    values = new Map();
++    vi.stubGlobal('localStorage', {
++      getItem: vi.fn((key: string) => values.get(key) ?? null),
++      setItem: vi.fn((key: string, value: string) => { values.set(key, value); }),
++      removeItem: vi.fn((key: string) => { values.delete(key); })
++    });
++  });
++  afterEach(() => {
++    vi.restoreAllMocks();
++    vi.unstubAllGlobals();
++  });
++
++  it('returns absent session and default preferences', () => {
++    expect(session.getToken()).toBeNull();
++    expect(session.getUser()).toEqual({});
++    expect(session.getPreferences()).toEqual({ theme: 'light', showTips: true, compact: false });
++  });
++
++  it('saves in the existing order and clears only token and user', () => {
++    const user = { username: 'student' };
++    const preferences = { theme: 'light', showTips: false, compact: true };
++    session.save('unit-token', user, preferences);
++    expect(vi.mocked(localStorage.setItem).mock.calls).toEqual([
++      ['workshop_token', 'unit-token'],
++      ['workshop_user', JSON.stringify(user)],
++      ['workshop_preferences', JSON.stringify(preferences)]
++    ]);
++    expect(session.getToken()).toBe('unit-token');
++    expect(session.getUser()).toEqual(user);
++    expect(session.getPreferences()).toEqual(preferences);
++    session.clear();
++    expect(session.getToken()).toBeNull();
++    expect(session.getUser()).toEqual({});
++    expect(values.get('workshop_preferences')).toBe(JSON.stringify(preferences));
++  });
++
++  it('preserves merging preferences and reports corrupt JSON', () => {
++    values.set('workshop_preferences', JSON.stringify({ compact: true, extra: { tips: false } }));
++    expect(session.getPreferences()).toEqual({
++      theme: 'light', showTips: true, compact: true, extra: { tips: false }
++    });
++    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
++    values.set('workshop_preferences', '{');
++    expect(session.getPreferences().compact).toBe(false);
++    expect(log).toHaveBeenCalledWith('Preferences could not be loaded', expect.any(SyntaxError));
++  });
++
++  it('does not hide a failed session write as success', () => {
++    const error = new Error('Storage unavailable');
++    vi.mocked(localStorage.setItem).mockImplementation(() => { throw error; });
++    expect(() => session.save('token', {}, session.getPreferences())).toThrow(error);
++  });
++});
+diff --git "a/artifacts\\after-H05/src/app/core/session.service.ts" "b/artifacts\\after-H05/src/app/core/session.service.ts"
+new file mode 100644
+index 0000000..83cb9ac
+--- /dev/null
++++ "b/artifacts\\after-H05/src/app/core/session.service.ts"
+@@ -0,0 +1,42 @@
++import { Injectable } from '@angular/core';
++import merge from 'lodash/merge';
++import { Preferences, SessionUser } from './models';
++
++const KEYS = {
++  token: 'workshop_token',
++  user: 'workshop_user',
++  preferences: 'workshop_preferences'
++};
++
++@Injectable({ providedIn: 'root' })
++export class SessionService {
++  getToken(): string | null {
++    return localStorage.getItem(KEYS.token);
++  }
++
++  getUser(): SessionUser {
++    return JSON.parse(localStorage.getItem(KEYS.user) || '{}');
++  }
++
++  getPreferences(): Preferences {
++    const preferences: Preferences = { theme: 'light', showTips: true, compact: false };
++    try {
++      const saved = JSON.parse(localStorage.getItem(KEYS.preferences) || '{}');
++      return merge(preferences, saved);
++    } catch (error) {
++      console.log('Preferences could not be loaded', error);
++      return preferences;
++    }
++  }
++
++  save(token: string, user: SessionUser, preferences: Preferences): void {
++    localStorage.setItem(KEYS.token, token);
++    localStorage.setItem(KEYS.user, JSON.stringify(user));
++    localStorage.setItem(KEYS.preferences, JSON.stringify(preferences));
++  }
++
++  clear(): void {
++    localStorage.removeItem(KEYS.token);
++    localStorage.removeItem(KEYS.user);
++  }
++}
+diff --git "a/artifacts\\after-H05/src/app/core/task-view.spec.ts" "b/artifacts\\after-H05/src/app/core/task-view.spec.ts"
+new file mode 100644
+index 0000000..9acaa11
+--- /dev/null
++++ "b/artifacts\\after-H05/src/app/core/task-view.spec.ts"
+@@ -0,0 +1,22 @@
++import { describe, expect, it } from 'vitest';
++import { prepareTaskView } from './task-view';
++
++describe('prepareTaskView', () => {
++  it.each([['A', 'B'], ['B', 'A']])('sorts %s and %s without mutating source tasks', (first, second) => {
++    const tasks = [
++      Object.freeze({ priority: first, status: 'TODO', owner: 'student' }),
++      Object.freeze({ priority: 'Z', status: 'ARCHIVED' }),
++      Object.freeze({ priority: second, status: 'DONE', owner: 'student' })
++    ];
++    expect(prepareTaskView(tasks).map(task => task.label)).toEqual(['B · STUDENT', 'A · STUDENT']);
++    expect(tasks[0].priority).toBe(first);
++    expect(tasks[0]).not.toHaveProperty('label');
++  });
++
++  it('preserves case-sensitive archived filtering and empty lists', () => {
++    expect(prepareTaskView([])).toEqual([]);
++    expect(prepareTaskView([{ priority: 'A', status: 'archived' }])).toEqual([
++      { priority: 'A', status: 'archived', label: 'A · SIN-ASIGNAR' }
++    ]);
++  });
++});
+diff --git "a/artifacts\\after-H05/src/app/core/task-view.ts" "b/artifacts\\after-H05/src/app/core/task-view.ts"
+new file mode 100644
+index 0000000..ae7a9a4
+--- /dev/null
++++ "b/artifacts\\after-H05/src/app/core/task-view.ts"
+@@ -0,0 +1,9 @@
++import { formatTaskLabel } from '../utils/legacy-format';
++import { Task, TaskView } from './models';
++
++export function prepareTaskView(tasks: Task[]): TaskView[] {
++  return tasks
++    .filter(task => task.status !== 'ARCHIVED')
++    .map(task => ({ ...task, label: formatTaskLabel(task) }))
++    .sort((a, b) => a.priority > b.priority ? -1 : 1);
++}
+diff --git "a/artifacts\\after-H05/src/app/core/tasks.service.spec.ts" "b/artifacts\\after-H05/src/app/core/tasks.service.spec.ts"
+new file mode 100644
+index 0000000..f7fa91c
+--- /dev/null
++++ "b/artifacts\\after-H05/src/app/core/tasks.service.spec.ts"
+@@ -0,0 +1,24 @@
++import '@angular/compiler';
++import axios from 'axios';
++import { afterEach, describe, expect, it, vi } from 'vitest';
++import { TasksService } from './tasks.service';
++
++describe('TasksService', () => {
++  afterEach(() => vi.restoreAllMocks());
++
++  it.each(['student', ''])('preserves owner %s, Bearer and the direct array', async owner => {
++    const data = [{ priority: 'HIGH', status: 'TODO' }];
++    const get = vi.spyOn(axios, 'get').mockResolvedValue({ data });
++    expect(await new TasksService().load(owner, 'unit-token')).toBe(data);
++    expect(get).toHaveBeenCalledExactlyOnceWith(
++      'http://localhost:8000/api/tasks?owner=' + owner,
++      { headers: { Authorization: 'Bearer unit-token' } }
++    );
++  });
++
++  it('propagates token rejection without changing the contract', async () => {
++    const error = { response: { status: 401, data: { detail: 'Invalid token' } } };
++    vi.spyOn(axios, 'get').mockRejectedValue(error);
++    await expect(new TasksService().load('student', 'invalid')).rejects.toBe(error);
++  });
++});
+diff --git "a/artifacts\\after-H05/src/app/core/tasks.service.ts" "b/artifacts\\after-H05/src/app/core/tasks.service.ts"
+new file mode 100644
+index 0000000..97f7f18
+--- /dev/null
++++ "b/artifacts\\after-H05/src/app/core/tasks.service.ts"
+@@ -0,0 +1,14 @@
++import { Injectable } from '@angular/core';
++import axios from 'axios';
++import { environment } from '../../environments/environment';
++import { Task } from './models';
++
++@Injectable({ providedIn: 'root' })
++export class TasksService {
++  async load(owner: string, token: string): Promise<Task[]> {
++    const response = await axios.get<Task[]>(environment.tasksUrl + '?owner=' + owner, {
++      headers: { Authorization: 'Bearer ' + token }
++    });
++    return response.data;
++  }
++}
+diff --git "a/artifacts\\baseline-H05/src/app/dashboard/dashboard.component.ts" "b/artifacts\\after-H05/src/app/dashboard/dashboard.component.ts"
+index 9bdf3bd..5f4971c 100644
+--- "a/artifacts\\baseline-H05/src/app/dashboard/dashboard.component.ts"
++++ "b/artifacts\\after-H05/src/app/dashboard/dashboard.component.ts"
+@@ -1,8 +1,10 @@
+ import { CommonModule } from '@angular/common';
+ import { ChangeDetectorRef, Component, NgZone, OnInit } from '@angular/core';
+ import { Router } from '@angular/router';
+-import axios from 'axios';
+-import { formatTaskLabel } from '../utils/legacy-format';
++import { SessionUser, Task, TaskView } from '../core/models';
++import { SessionService } from '../core/session.service';
++import { TasksService } from '../core/tasks.service';
++import { prepareTaskView } from '../core/task-view';
+ 
+ const STATUS_LABELS: Record<string, string> = {
+   TODO: 'Por hacer',
+@@ -20,45 +22,41 @@ const STATUS_LABELS: Record<string, string> = {
+   styleUrl: './dashboard.component.css'
+ })
+ export class DashboardComponent implements OnInit {
+-  tasks: any[] = [];
+-  visibleTasks: any[] = [];
+-  user: any = {};
++  tasks: Task[] = [];
++  visibleTasks: TaskView[] = [];
++  user: SessionUser = {};
+   loading: any = true;
+   error: any = '';
+ 
+-  constructor(private router: Router, private cdr: ChangeDetectorRef, private zone: NgZone) {}
++  constructor(
++    private router: Router,
++    private cdr: ChangeDetectorRef,
++    private zone: NgZone,
++    private session: SessionService,
++    private taskService: TasksService
++  ) {}
+ 
+   statusLabel(status: string): string {
+     return STATUS_LABELS[(status || '').toUpperCase()] || status;
+   }
+ 
+   async ngOnInit(): Promise<void> {
+-    const token = localStorage.getItem('workshop_token');
+-    this.user = JSON.parse(localStorage.getItem('workshop_user') || '{}');
++    const token = this.session.getToken();
++    this.user = this.session.getUser();
+     if (!token) {
+       await this.router.navigate(['/login']);
+       return;
+     }
+     try {
+-      const response: any = await axios.get('http://localhost:8000/api/tasks?owner=' + (this.user.username || ''), {
+-        headers: { Authorization: 'Bearer ' + token }
+-      });
+-      const tasks = response.data;
+-      const tmp: any[] = [];
+-      for (let i = 0; i < tasks.length; i++) {
+-        if (tasks[i].status !== 'ARCHIVED') {
+-          tasks[i].label = formatTaskLabel(tasks[i]);
+-          tmp.push(tasks[i]);
+-        }
+-      }
+-      tmp.sort((a: any, b: any) => a.priority > b.priority ? -1 : 1);
++      const tasks = await this.taskService.load(this.user.username || '', token);
++      const visibleTasks = prepareTaskView(tasks);
+       // axios resuelve a veces fuera de la zona de Angular (más aún llegando
+       // por navegación desde el login): forzamos volver a entrar a la zona
+       // y disparamos detectChanges a mano para no depender de que Angular
+       // lo detecte solo.
+       this.zone.run(() => {
+         this.tasks = tasks;
+-        this.visibleTasks = tmp;
++        this.visibleTasks = visibleTasks;
+         this.loading = false;
+         this.cdr.detectChanges();
+       });
+@@ -72,8 +70,7 @@ export class DashboardComponent implements OnInit {
+   }
+ 
+   async logout(): Promise<void> {
+-    localStorage.removeItem('workshop_token');
+-    localStorage.removeItem('workshop_user');
++    this.session.clear();
+     await this.router.navigate(['/login']);
+   }
+ }
+diff --git "a/artifacts\\after-H05/src/app/login/component-services.spec.ts" "b/artifacts\\after-H05/src/app/login/component-services.spec.ts"
+new file mode 100644
+index 0000000..7a47d87
+--- /dev/null
++++ "b/artifacts\\after-H05/src/app/login/component-services.spec.ts"
+@@ -0,0 +1,61 @@
++import '@angular/compiler';
++import 'zone.js';
++import { ChangeDetectorRef, NgZone } from '@angular/core';
++import { Router } from '@angular/router';
++import { afterEach, describe, expect, it, vi } from 'vitest';
++import { AuthService } from '../core/auth.service';
++import { SessionService } from '../core/session.service';
++import { TasksService } from '../core/tasks.service';
++import { DashboardComponent } from '../dashboard/dashboard.component';
++import { LoginComponent } from './login.component';
++
++vi.mock('@angular/router', () => ({
++  Router: class { navigate = vi.fn(async () => true); }
++}));
++
++describe('component service boundaries', () => {
++  afterEach(() => vi.restoreAllMocks());
++
++  it('lets login orchestrate mocked services and navigation without storage access', async () => {
++    const session = new SessionService();
++    const preferences = { theme: 'light', showTips: true, compact: false };
++    vi.spyOn(session, 'getPreferences').mockReturnValue(preferences);
++    const save = vi.spyOn(session, 'save').mockImplementation(() => {});
++    const auth = new AuthService();
++    const user = { username: 'student' };
++    const login = vi.spyOn(auth, 'login').mockResolvedValue({ token: 'unit-token', user });
++    const router = new Router();
++    const component = new LoginComponent(router, auth, session);
++    component.username = 'student';
++    component.password = 'test';
++    await component.login();
++    expect(login).toHaveBeenCalledExactlyOnceWith({ username: 'student', password: 'test' });
++    expect(save).toHaveBeenCalledExactlyOnceWith('unit-token', user, preferences);
++    expect(router.navigate).toHaveBeenCalledExactlyOnceWith(['/dashboard']);
++    expect(component.busy).toBe(false);
++  });
++
++  it('lets dashboard use mocked services while owning visible state and navigation', async () => {
++    const session = new SessionService();
++    vi.spyOn(session, 'getToken').mockReturnValue('unit-token');
++    vi.spyOn(session, 'getUser').mockReturnValue({ username: 'student' });
++    const clear = vi.spyOn(session, 'clear').mockImplementation(() => {});
++    const tasks = new TasksService();
++    const load = vi.spyOn(tasks, 'load').mockResolvedValue([{ priority: 'A', status: 'TODO' }]);
++    const router = new Router();
++    const cdr: ChangeDetectorRef = {
++      detectChanges: vi.fn(), markForCheck: vi.fn(), detach: vi.fn(),
++      checkNoChanges: vi.fn(), reattach: vi.fn()
++    };
++    const component = new DashboardComponent(
++      router, cdr, new NgZone({}), session, tasks
++    );
++    await component.ngOnInit();
++    expect(load).toHaveBeenCalledExactlyOnceWith('student', 'unit-token');
++    expect(component.visibleTasks[0].label).toBe('A · SIN-ASIGNAR');
++    expect(component.loading).toBe(false);
++    await component.logout();
++    expect(clear).toHaveBeenCalledOnce();
++    expect(router.navigate).toHaveBeenCalledExactlyOnceWith(['/login']);
++  });
++});
+diff --git "a/artifacts\\baseline-H05/src/app/login/login-flow.spec.ts" "b/artifacts\\after-H05/src/app/login/login-flow.spec.ts"
+index 1ed347a..5169e12 100644
+--- "a/artifacts\\baseline-H05/src/app/login/login-flow.spec.ts"
++++ "b/artifacts\\after-H05/src/app/login/login-flow.spec.ts"
+@@ -6,6 +6,9 @@ import axios from 'axios';
+ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+ import { DashboardComponent } from '../dashboard/dashboard.component';
+ import { LoginComponent } from './login.component';
++import { AuthService } from '../core/auth.service';
++import { SessionService } from '../core/session.service';
++import { TasksService } from '../core/tasks.service';
+ 
+ vi.mock('axios', () => ({
+   default: { post: vi.fn(), get: vi.fn() }
+@@ -41,15 +44,22 @@ describe('login and tasks contract', () => {
+   };
+   const zone = new NgZone({ enableLongStackTrace: false });
+   let storage: MemoryStorage;
++  const auth = new AuthService();
++  const session = new SessionService();
++  const tasksService = new TasksService();
++
++  function createDashboard(): DashboardComponent {
++    return new DashboardComponent(router, cdr, zone, session, tasksService);
++  }
+ 
+   function authenticatedDashboard(): DashboardComponent {
+     storage.setItem('workshop_token', 'test-token');
+     storage.setItem('workshop_user', JSON.stringify(user));
+-    return new DashboardComponent(router, cdr, zone);
++    return createDashboard();
+   }
+ 
+   function validLogin(): LoginComponent {
+-    const login = new LoginComponent(router);
++    const login = new LoginComponent(router, auth, session);
+     login.username = user.username;
+     login.password = 'test-password';
+     return login;
+@@ -91,7 +101,7 @@ describe('login and tasks contract', () => {
+       { title: 'Second', priority: 'B', owner: 'trainer', status: 'DONE' }
+     ];
+     vi.mocked(axios.get).mockResolvedValue({ data: tasks });
+-    const dashboard = new DashboardComponent(router, cdr, zone);
++    const dashboard = createDashboard();
+     await dashboard.ngOnInit();
+     expect(axios.get).toHaveBeenCalledExactlyOnceWith(
+       'http://localhost:8000/api/tasks?owner=student',
+@@ -127,7 +137,7 @@ describe('login and tasks contract', () => {
+       expect(storage.getItem('workshop_token')).toBe('test-token');
+       return new Promise(resolve => { complete = resolve; });
+     });
+-    const dashboard = new DashboardComponent(router, cdr, zone);
++    const dashboard = createDashboard();
+     const pending = dashboard.ngOnInit();
+     expect(dashboard.loading).toBe(true);
+     expect(axios.get).toHaveBeenCalledWith(
+@@ -206,16 +216,25 @@ describe('login and tasks contract', () => {
+   });
+ 
+   it('returns to login without requesting tasks when there is no token', async () => {
+-    const dashboard = new DashboardComponent(router, cdr, zone);
++    const dashboard = createDashboard();
+     await dashboard.ngOnInit();
+     expect(navigate).toHaveBeenCalledExactlyOnceWith(['/login']);
+     expect(axios.get).not.toHaveBeenCalled();
+   });
+ 
++  it.each([['A', 'B'], ['B', 'A']])('preserves descending comparison for %s then %s', async (first, second) => {
++    const dashboard = authenticatedDashboard();
++    vi.mocked(axios.get).mockResolvedValue({
++      data: [first, second].map(priority => ({ priority, status: 'TODO' }))
++    });
++    await dashboard.ngOnInit();
++    expect(dashboard.visibleTasks.map(task => task.priority)).toEqual(['B', 'A']);
++  });
++
+   it('handles an empty task list and absent username', async () => {
+     storage.setItem('workshop_token', 'test-token');
+     vi.mocked(axios.get).mockResolvedValue({ data: [] });
+-    const dashboard = new DashboardComponent(router, cdr, zone);
++    const dashboard = createDashboard();
+     await dashboard.ngOnInit();
+     expect(axios.get).toHaveBeenCalledWith(
+       'http://localhost:8000/api/tasks?owner=',
+diff --git "a/artifacts\\baseline-H05/src/app/login/login.component.ts" "b/artifacts\\after-H05/src/app/login/login.component.ts"
+index b7cc137..61cf234 100644
+--- "a/artifacts\\baseline-H05/src/app/login/login.component.ts"
++++ "b/artifacts\\after-H05/src/app/login/login.component.ts"
+@@ -2,8 +2,9 @@ import { CommonModule } from '@angular/common';
+ import { Component } from '@angular/core';
+ import { FormsModule } from '@angular/forms';
+ import { Router } from '@angular/router';
+-import axios from 'axios';
+-import merge from 'lodash/merge';
++import { AuthService } from '../core/auth.service';
++import { Preferences } from '../core/models';
++import { SessionService } from '../core/session.service';
+ 
+ @Component({
+   selector: 'app-login',
+@@ -17,48 +18,41 @@ export class LoginComponent {
+   password: any = '';
+   busy: any = false;
+   message: any = '';
+-  preferences: any = { theme: 'light', showTips: true, compact: false };
++  preferences: Preferences;
+ 
+-  constructor(private router: Router) {
+-    try {
+-      const saved = JSON.parse(localStorage.getItem('workshop_preferences') || '{}');
+-      this.preferences = merge(this.preferences, saved);
+-    } catch (error) {
+-      console.log('Preferences could not be loaded', error);
+-    }
++  constructor(
++    private router: Router,
++    private auth: AuthService,
++    private session: SessionService
++  ) {
++    this.preferences = this.session.getPreferences();
+   }
+ 
+   async login(): Promise<void> {
+     this.message = '';
+     if (this.username === null || this.username === undefined || String(this.username).trim() === '') {
+       this.message = '<strong>Ingrese un usuario.</strong>';
+-    } else {
+-      if (this.password === null || this.password === undefined || String(this.password).trim() === '') {
+-        this.message = '<strong>Ingrese una contraseña.</strong>';
++      return;
++    }
++    if (this.password === null || this.password === undefined || String(this.password).trim() === '') {
++      this.message = '<strong>Ingrese una contraseña.</strong>';
++      return;
++    }
++    this.busy = true;
++    try {
++      const response = await this.auth.login({ username: this.username, password: this.password });
++      if (response && response.token) {
++        this.session.save(response.token, response.user, this.preferences);
++        await this.router.navigate(['/dashboard']);
+       } else {
+-        this.busy = true;
+-        try {
+-          const response: any = await axios.post(
+-            'http://localhost:8080/auth/login',
+-            { username: this.username, password: this.password, client: 'angular-workshop' },
+-            { timeout: 5000 }
+-          );
+-          if (response && response.data && response.data.token) {
+-            localStorage.setItem('workshop_token', response.data.token);
+-            localStorage.setItem('workshop_user', JSON.stringify(response.data.user));
+-            localStorage.setItem('workshop_preferences', JSON.stringify(this.preferences));
+-            await this.router.navigate(['/dashboard']);
+-          } else {
+-            this.message = '<strong>El backend respondió sin token.</strong>';
+-          }
+-        } catch (error: any) {
+-          const backendMessage = error?.response?.data?.message || error?.message || 'Error desconocido';
+-          this.message = '<strong>No se pudo autenticar a ' + this.username + '.</strong><br>' + backendMessage;
+-          console.error(error);
+-        } finally {
+-          this.busy = false;
+-        }
++        this.message = '<strong>El backend respondió sin token.</strong>';
+       }
++    } catch (error: any) {
++      const backendMessage = error?.response?.data?.message || error?.message || 'Error desconocido';
++      this.message = '<strong>No se pudo autenticar a ' + this.username + '.</strong><br>' + backendMessage;
++      console.error(error);
++    } finally {
++      this.busy = false;
+     }
+   }
+ }
+diff --git "a/artifacts\\after-H05/src/environments/environment.ts" "b/artifacts\\after-H05/src/environments/environment.ts"
+new file mode 100644
+index 0000000..5feb070
+--- /dev/null
++++ "b/artifacts\\after-H05/src/environments/environment.ts"
+@@ -0,0 +1,6 @@
++export const environment = {
++  authUrl: 'http://localhost:8080/auth/login',
++  tasksUrl: 'http://localhost:8000/api/tasks',
++  client: 'angular-workshop',
++  loginTimeout: 5000
++};
+diff --git "a/artifacts\\baseline-H05/vitest.config.ts" "b/artifacts\\after-H05/vitest.config.ts"
+index 902bd04..06bc4cf 100644
+--- "a/artifacts\\baseline-H05/vitest.config.ts"
++++ "b/artifacts\\after-H05/vitest.config.ts"
+@@ -9,7 +9,9 @@ export default defineConfig({
+       include: [
+         'src/app/login/login.component.ts',
+         'src/app/dashboard/dashboard.component.ts',
+-        'src/app/utils/legacy-format.ts'
++        'src/app/utils/legacy-format.ts',
++        'src/app/core/**/*.ts',
++        'src/environments/environment.ts'
+       ],
+       thresholds: {
+         perFile: true,

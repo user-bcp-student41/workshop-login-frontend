@@ -1,0 +1,269 @@
+diff --git "a/artifacts\\before-H02/HALLAZGOS.md" "b/artifacts\\after-H02/HALLAZGOS.md"
+index a8300e2..dd0769a 100644
+--- "a/artifacts\\before-H02/HALLAZGOS.md"
++++ "b/artifacts\\after-H02/HALLAZGOS.md"
+@@ -7,7 +7,7 @@ Revisión estática del código fuente actual. Las evidencias usan rutas relativ
+ | id | hallazgo | tipo | explicacion | evidencia (archivo:linea) | severidad | estado |
+ |---|---|---|---|---|---|---|
+ | H-01 | Seguridad: token persistido en `localStorage` | Vulnerabilidad | Token/usuario solo en memoria, limpieza de claves heredadas y advertencia visible si falla; preferencias conservadas. Baseline 56 y resultado 58 tests verdes, cobertura 100%, navegador con recarga y segundo login/logout; no evita ejecución de scripts maliciosos en origen. | [session.service.ts](./src/app/core/session.service.ts); [session.service.spec.ts](./src/app/core/session.service.spec.ts); [docs/TESTING.md](./docs/TESTING.md); [artifacts/H-01.patch](./artifacts/H-01.patch) | alta | Resuelto |
+-| H-02 | Seguridad: mensaje dinámico renderizado con `[innerHTML]` | Vulnerabilidad | Confirmado: el usuario y el mensaje de error externo se concatenan como HTML. Contenido no confiable puede alterar la presentación del error. Angular sanitiza este enlace por defecto y aquí no se observa una omisión de esa protección; un XSS ejecutable es una hipótesis no demostrada, no un resultado de esta revisión. | [src/app/login/login.component.ts:55](./src/app/login/login.component.ts#L55); [src/app/login/login.component.ts:56](./src/app/login/login.component.ts#L56); [src/app/login/login.component.html:39](./src/app/login/login.component.html#L39) | media | Pendiente |
++| H-02 | Seguridad: mensaje dinámico renderizado con `[innerHTML]` | Vulnerabilidad | Interpolación textual, mensajes públicos compartidos y logs de categoría sin detalles externos; actualización de vista al finalizar login. Baseline 58 y resultado 67 tests verdes (100% ejecutable); DOM verifica etiquetas literales, sin nodos dinámicos ni detalle interno. | [http-error-message.spec.ts](./src/app/core/http-error-message.spec.ts); [login.component.html](./src/app/login/login.component.html); [docs/TESTING.md](./docs/TESTING.md); [artifacts/H-02.patch](./artifacts/H-02.patch) | media | Resuelto |
+ | H-03 | Dependencias: `lodash 4.17.21` y `axios 0.31.0` declarados y utilizados | Sugerencia | Confirmadas las versiones declaradas y el uso de Axios para HTTP y de `lodash/merge` para preferencias locales. Se requiere contrastar avisos de seguridad, versiones efectivamente resueltas y rutas alcanzables antes de decidir actualizar o eliminar. No se atribuye ningún CVE ni vulnerabilidad explotable a estas versiones sin esa verificación; una dependencia afectada y alcanzable podría comprometer el procesamiento de datos o peticiones. | [package.json:19](./package.json#L19); [package.json:20](./package.json#L20); [src/app/login/login.component.ts:5](./src/app/login/login.component.ts#L5); [src/app/login/login.component.ts:25](./src/app/login/login.component.ts#L25); [src/app/dashboard/dashboard.component.ts:43](./src/app/dashboard/dashboard.component.ts#L43) | media | Pendiente |
+ | H-04 | Testing: pruebas limitadas a una utilidad | Sugerencia | Resuelto con pruebas de flujo, orden de persistencia, carga pendiente y logout sin HTTP adicional; 39 pruebas verdes y cobertura por archivo >=85%. Navegador: éxito, lista vacía, error 401 y logout verificados; evidencia y límites en docs/TESTING.md, diff local artifacts/H-04.patch. | [src/app/login/login-flow.spec.ts](./src/app/login/login-flow.spec.ts); [vitest.config.ts](./vitest.config.ts); [docs/TESTING.md](./docs/TESTING.md); [artifacts/H-04.patch](./artifacts/H-04.patch) | media | Resuelto |
+ | H-05 | Arquitectura: componentes conocen URLs, HTTP, sesión y navegación | Refactor | Resuelto extrayendo AuthService, TasksService, SessionService, configuración y preparación pura de tareas; componentes conservan UI/navegación. Baseline de 41 y resultado de 55 tests verdes, cobertura ejecutable 100%, build y navegador aprobados; diff local artifacts/H-05.patch. | [src/app/core/auth.service.ts](./src/app/core/auth.service.ts); [src/app/core/tasks.service.ts](./src/app/core/tasks.service.ts); [src/app/core/session.service.ts](./src/app/core/session.service.ts); [src/app/core/task-view.ts](./src/app/core/task-view.ts); [src/environments/environment.ts](./src/environments/environment.ts); [src/app/login/login-flow.spec.ts](./src/app/login/login-flow.spec.ts); [artifacts/H-05.patch](./artifacts/H-05.patch) | baja | Resuelto |
+diff --git "a/artifacts\\before-H02/docs/TESTING.md" "b/artifacts\\after-H02/docs/TESTING.md"
+index d377982..6f470fb 100644
+--- "a/artifacts\\before-H02/docs/TESTING.md"
++++ "b/artifacts\\after-H02/docs/TESTING.md"
+@@ -227,3 +227,11 @@ Política confirmada por el usuario: recargar o abrir otra pestaña requiere log
+ - Navegador: en el servidor de validación propio `http://localhost:4201`, login simulado carga Memory task, localStorage no contiene token/usuario y sí preferencias; recarga redirige a login; segundo login y logout aprobados.
+ - Intento previo en el servidor ya existente de 4200 falló la comprobación de persistencia. No se atribuyó éxito a ese servidor ni se manipuló su proceso. Se arrancó un servidor desde este componente con `npm start -- --port 4201` y se verificó su respuesta mediante navegador. La herramienta de tareas no admitió crear tarea en esta carpeta; se usó PowerShell. No hubo instalaciones.
+ - Directorio de los comandos: raíz de workshop-login-frontend. Diff propio: [H-01.patch](../artifacts/H-01.patch). H-01 cerrado antes de iniciar H-02.
++
++## H-02: representación textual y errores públicos
++
++- Baseline: `npm run test:coverage`, salida 0, 58 tests. Conserva el contrato HTTP; reemplaza intencionalmente textos internos y formato HTML por texto público.
++- Corrección: mismo comando, salida 0, 67 tests; 100% de las cuatro métricas ejecutables. Nueve casos del helper cubren contextos, timeout y entradas desconocidas, sin cuerpos externos en logs; los casos integrados siguen comprobando carga, ausencia de sesión en fallo y no redirección automática ante 401/403.
++- Navegador 4201: usuario `<b>Literal User</b>` y backend 401/message con `<b>private-backend-detail</b>`. Se verificó texto literal del usuario, cero elementos b dentro de la alerta, detalle interno ausente y botón habilitado al terminar.
++- Primera comprobación de navegador falló: el log de error existía, pero la UI permanecía Ingresando. Se corrigió el defecto de actualización directamente acoplado a H-02: finally entra en NgZone y solicita detectChanges, como dashboard. Se añadió aserción de detección en el test del componente y se repitió el DOM con éxito. No se ocultó el fallo en tests ni se atribuyó a la sanitización.
++- No se usan bypass ni sanitizadores nuevos; no se afirmó XSS explotable previo. Diff propio [H-02.patch](../artifacts/H-02.patch). H-02 cerrado antes de H-03.
+diff --git "a/artifacts\\after-H02/src/app/core/http-error-message.spec.ts" "b/artifacts\\after-H02/src/app/core/http-error-message.spec.ts"
+new file mode 100644
+index 0000000..85769fd
+--- /dev/null
++++ "b/artifacts\\after-H02/src/app/core/http-error-message.spec.ts"
+@@ -0,0 +1,28 @@
++import { afterEach, describe, expect, it, vi } from 'vitest';
++import { httpErrorMessage } from './http-error-message';
++
++describe('public error messages', () => {
++  afterEach(() => vi.restoreAllMocks());
++
++  it.each([null, undefined, 'private detail', {}, new Error('private detail'),
++    { response: { data: { message: '<b>private detail</b>', detail: 'private detail' } } },
++    { code: 'ERR_NETWORK', config: { password: 'private detail' } }
++  ])('does not expose unexpected or backend details for %j', error => {
++    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
++    expect(httpErrorMessage(error, 'login')).toBe(
++      'No se pudo iniciar sesión. Verifica tus datos e inténtalo de nuevo.'
++    );
++    expect(httpErrorMessage(error, 'tasks')).toBe(
++      'No se pudieron cargar las tareas. Inténtalo de nuevo.'
++    );
++    expect(log.mock.calls).toEqual([['login: request-failed'], ['tasks: request-failed']]);
++  });
++
++  it.each(['login', 'tasks'] as const)('maps a timeout safely in %s', context => {
++    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
++    expect(httpErrorMessage({ code: 'ECONNABORTED', message: 'private' }, context)).toBe(
++      'La solicitud tardó demasiado. Inténtalo de nuevo.'
++    );
++    expect(log).toHaveBeenCalledExactlyOnceWith(context + ': timeout');
++  });
++});
+diff --git "a/artifacts\\after-H02/src/app/core/http-error-message.ts" "b/artifacts\\after-H02/src/app/core/http-error-message.ts"
+new file mode 100644
+index 0000000..5b0588b
+--- /dev/null
++++ "b/artifacts\\after-H02/src/app/core/http-error-message.ts"
+@@ -0,0 +1,11 @@
++export function httpErrorMessage(error: unknown, context: 'login' | 'tasks'): string {
++  const timeout = typeof error === 'object' && error !== null &&
++    'code' in error && error.code === 'ECONNABORTED';
++  console.error(context + ': ' + (timeout ? 'timeout' : 'request-failed'));
++  if (timeout) {
++    return 'La solicitud tardó demasiado. Inténtalo de nuevo.';
++  }
++  return context === 'login'
++    ? 'No se pudo iniciar sesión. Verifica tus datos e inténtalo de nuevo.'
++    : 'No se pudieron cargar las tareas. Inténtalo de nuevo.';
++}
+diff --git "a/artifacts\\before-H02/src/app/dashboard/dashboard.component.ts" "b/artifacts\\after-H02/src/app/dashboard/dashboard.component.ts"
+index 5f4971c..80fcc32 100644
+--- "a/artifacts\\before-H02/src/app/dashboard/dashboard.component.ts"
++++ "b/artifacts\\after-H02/src/app/dashboard/dashboard.component.ts"
+@@ -5,6 +5,7 @@ import { SessionUser, Task, TaskView } from '../core/models';
+ import { SessionService } from '../core/session.service';
+ import { TasksService } from '../core/tasks.service';
+ import { prepareTaskView } from '../core/task-view';
++import { httpErrorMessage } from '../core/http-error-message';
+ 
+ const STATUS_LABELS: Record<string, string> = {
+   TODO: 'Por hacer',
+@@ -60,9 +61,9 @@ export class DashboardComponent implements OnInit {
+         this.loading = false;
+         this.cdr.detectChanges();
+       });
+-    } catch (error: any) {
++    } catch (error: unknown) {
+       this.zone.run(() => {
+-        this.error = error?.response?.data?.detail || error?.message || 'No se pudo cargar el dashboard';
++        this.error = httpErrorMessage(error, 'tasks');
+         this.loading = false;
+         this.cdr.detectChanges();
+       });
+diff --git "a/artifacts\\before-H02/src/app/login/component-services.spec.ts" "b/artifacts\\after-H02/src/app/login/component-services.spec.ts"
+index cf06d3a..4f7a77c 100644
+--- "a/artifacts\\before-H02/src/app/login/component-services.spec.ts"
++++ "b/artifacts\\after-H02/src/app/login/component-services.spec.ts"
+@@ -31,7 +31,11 @@ describe('component service boundaries', () => {
+     const user = { username: 'student' };
+     const login = vi.spyOn(auth, 'login').mockResolvedValue({ token: 'unit-token', user });
+     const router = new Router();
+-    const component = new LoginComponent(router, auth, session);
++    const cdr: ChangeDetectorRef = {
++      detectChanges: vi.fn(), markForCheck: vi.fn(), detach: vi.fn(),
++      checkNoChanges: vi.fn(), reattach: vi.fn()
++    };
++    const component = new LoginComponent(router, auth, session, new NgZone({}), cdr);
+     component.username = 'student';
+     component.password = 'test';
+     await component.login();
+@@ -39,6 +43,7 @@ describe('component service boundaries', () => {
+     expect(save).toHaveBeenCalledExactlyOnceWith('unit-token', user, preferences);
+     expect(router.navigate).toHaveBeenCalledExactlyOnceWith(['/dashboard']);
+     expect(component.busy).toBe(false);
++    expect(cdr.detectChanges).toHaveBeenCalledOnce();
+   });
+ 
+   it('lets dashboard use mocked services while owning visible state and navigation', async () => {
+diff --git "a/artifacts\\before-H02/src/app/login/login-flow.spec.ts" "b/artifacts\\after-H02/src/app/login/login-flow.spec.ts"
+index 8d73763..15373fe 100644
+--- "a/artifacts\\before-H02/src/app/login/login-flow.spec.ts"
++++ "b/artifacts\\after-H02/src/app/login/login-flow.spec.ts"
+@@ -58,7 +58,7 @@ describe('login and tasks contract', () => {
+   }
+ 
+   function validLogin(): LoginComponent {
+-    const login = new LoginComponent(router, auth, session);
++    const login = new LoginComponent(router, auth, session, zone, cdr);
+     login.username = user.username;
+     login.password = 'test-password';
+     return login;
+@@ -102,6 +102,7 @@ describe('login and tasks contract', () => {
+       { title: 'Hidden', priority: 'Z', owner: 'student', status: 'ARCHIVED' },
+       { title: 'Second', priority: 'B', owner: 'trainer', status: 'DONE' }
+     ];
++    detectChanges.mockClear();
+     vi.mocked(axios.get).mockResolvedValue({ data: tasks });
+     const dashboard = createDashboard();
+     await dashboard.ngOnInit();
+@@ -203,10 +204,10 @@ describe('login and tasks contract', () => {
+   });
+ 
+   it.each([
+-    ['backend down', { message: 'Network Error' }, 'Network Error'],
+-    ['timeout', { code: 'ECONNABORTED', message: 'timeout of 5000ms exceeded' }, 'timeout of 5000ms exceeded'],
+-    ['backend rejection', { response: { data: { message: 'Credenciales inválidas' } } }, 'Credenciales inválidas'],
+-    ['unknown error', {}, 'Error desconocido']
++    ['backend down', { message: 'Network Error' }, 'No se pudo iniciar sesión.'],
++    ['timeout', { code: 'ECONNABORTED', message: 'timeout of 5000ms exceeded' }, 'La solicitud tardó demasiado.'],
++    ['backend rejection', { response: { data: { message: 'Credenciales inválidas' } } }, 'No se pudo iniciar sesión.'],
++    ['unknown error', {}, 'No se pudo iniciar sesión.']
+   ])('finishes login and reports %s without creating a session', async (_name, error, message) => {
+     vi.mocked(axios.post).mockRejectedValue(error);
+     const login = validLogin();
+@@ -215,7 +216,8 @@ describe('login and tasks contract', () => {
+     expect(login.busy).toBe(false);
+     expect(storage.getItem('workshop_token')).toBeNull();
+     expect(navigate).not.toHaveBeenCalled();
+-    expect(console.error).toHaveBeenCalledWith(error);
++    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/^login: (timeout|request-failed)$/));
++    expect(session.getToken()).toBeNull();
+   });
+ 
+   it('returns to login without requesting tasks when there is no token', async () => {
+@@ -249,11 +251,11 @@ describe('login and tasks contract', () => {
+   });
+ 
+   it.each([
+-    ['backend down', { message: 'Network Error' }, 'Network Error'],
+-    ['invalid token', { response: { status: 401, data: { detail: 'Token inválido' } } }, 'Token inválido'],
+-    ['forbidden', { response: { status: 403, data: { detail: 'Acceso denegado' } } }, 'Acceso denegado'],
+-    ['timeout rejection', { code: 'ECONNABORTED', message: 'timeout exceeded' }, 'timeout exceeded'],
+-    ['unknown error', {}, 'No se pudo cargar el dashboard']
++    ['backend down', { message: 'Network Error' }, 'No se pudieron cargar las tareas. Inténtalo de nuevo.'],
++    ['invalid token', { response: { status: 401, data: { detail: 'Token inválido' } } }, 'No se pudieron cargar las tareas. Inténtalo de nuevo.'],
++    ['forbidden', { response: { status: 403, data: { detail: 'Acceso denegado' } } }, 'No se pudieron cargar las tareas. Inténtalo de nuevo.'],
++    ['timeout rejection', { code: 'ECONNABORTED', message: 'timeout exceeded' }, 'La solicitud tardó demasiado. Inténtalo de nuevo.'],
++    ['unknown error', {}, 'No se pudieron cargar las tareas. Inténtalo de nuevo.']
+   ])('finishes task loading and reports %s', async (_name, error, message) => {
+     const dashboard = authenticatedDashboard();
+     vi.mocked(axios.get).mockRejectedValue(error);
+diff --git "a/artifacts\\before-H02/src/app/login/login.component.html" "b/artifacts\\after-H02/src/app/login/login.component.html"
+index 3e47494..fca4a8c 100644
+--- "a/artifacts\\before-H02/src/app/login/login.component.html"
++++ "b/artifacts\\after-H02/src/app/login/login.component.html"
+@@ -37,7 +37,7 @@
+     </button>
+ 
+     <p role="status" *ngIf="session.storageWarning">{{ session.storageWarning }}</p>
+-    <div class="message" *ngIf="message" [innerHTML]="message"></div>
++    <div class="message" role="alert" *ngIf="message">{{ message }}</div>
+ 
+     <small>Laboratorio local. No utilices credenciales reales.</small>
+   </section>
+diff --git "a/artifacts\\before-H02/src/app/login/login.component.ts" "b/artifacts\\after-H02/src/app/login/login.component.ts"
+index a3c757a..a0cf109 100644
+--- "a/artifacts\\before-H02/src/app/login/login.component.ts"
++++ "b/artifacts\\after-H02/src/app/login/login.component.ts"
+@@ -1,10 +1,11 @@
+ import { CommonModule } from '@angular/common';
+-import { Component } from '@angular/core';
++import { ChangeDetectorRef, Component, NgZone } from '@angular/core';
+ import { FormsModule } from '@angular/forms';
+ import { Router } from '@angular/router';
+ import { AuthService } from '../core/auth.service';
+ import { Preferences } from '../core/models';
+ import { SessionService } from '../core/session.service';
++import { httpErrorMessage } from '../core/http-error-message';
+ 
+ @Component({
+   selector: 'app-login',
+@@ -23,7 +24,9 @@ export class LoginComponent {
+   constructor(
+     private router: Router,
+     private auth: AuthService,
+-    public session: SessionService
++    public session: SessionService,
++    private zone: NgZone,
++    private cdr: ChangeDetectorRef
+   ) {
+     this.preferences = this.session.getPreferences();
+   }
+@@ -31,11 +34,11 @@ export class LoginComponent {
+   async login(): Promise<void> {
+     this.message = '';
+     if (this.username === null || this.username === undefined || String(this.username).trim() === '') {
+-      this.message = '<strong>Ingrese un usuario.</strong>';
++      this.message = 'Ingrese un usuario.';
+       return;
+     }
+     if (this.password === null || this.password === undefined || String(this.password).trim() === '') {
+-      this.message = '<strong>Ingrese una contraseña.</strong>';
++      this.message = 'Ingrese una contraseña.';
+       return;
+     }
+     this.busy = true;
+@@ -45,14 +48,15 @@ export class LoginComponent {
+         this.session.save(response.token, response.user, this.preferences);
+         await this.router.navigate(['/dashboard']);
+       } else {
+-        this.message = '<strong>El backend respondió sin token.</strong>';
++        this.message = 'El backend respondió sin token.';
+       }
+-    } catch (error: any) {
+-      const backendMessage = error?.response?.data?.message || error?.message || 'Error desconocido';
+-      this.message = '<strong>No se pudo autenticar a ' + this.username + '.</strong><br>' + backendMessage;
+-      console.error(error);
++    } catch (error: unknown) {
++      this.message = 'No se pudo autenticar a ' + this.username + '. ' + httpErrorMessage(error, 'login');
+     } finally {
+-      this.busy = false;
++      this.zone.run(() => {
++        this.busy = false;
++        this.cdr.detectChanges();
++      });
+     }
+   }
+ }

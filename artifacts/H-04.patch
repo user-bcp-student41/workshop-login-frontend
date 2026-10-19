@@ -1,0 +1,505 @@
+diff --git a/src/app/utils/legacy-format.spec.ts b/src/app/utils/legacy-format.spec.ts
+index 02d2dd3..177be13 100644
+--- a/src/app/utils/legacy-format.spec.ts
++++ b/src/app/utils/legacy-format.spec.ts
+@@ -5,4 +5,16 @@ describe('formatTaskLabel', () => {
+   it('formats priority and owner', () => {
+     expect(formatTaskLabel({ priority: 'high', owner: 'student' })).toBe('HIGH · STUDENT');
+   });
++
++  it.each([null, undefined])('handles absent task %s', task => {
++    expect(formatTaskLabel(task)).toBe('SIN-DATOS');
++  });
++
++  it('uses defaults when priority and owner are absent', () => {
++    expect(formatTaskLabel({})).toBe('NORMAL · SIN-ASIGNAR');
++  });
++
++  it('converts populated values to text', () => {
++    expect(formatTaskLabel({ priority: 2, owner: 42 })).toBe('2 · 42');
++  });
+ });
+diff --git a/vitest.config.ts b/vitest.config.ts
+index e613341..902bd04 100644
+--- a/vitest.config.ts
++++ b/vitest.config.ts
+@@ -6,6 +6,18 @@ export default defineConfig({
+     include: ['src/**/*.spec.ts'],
+     coverage: {
+       provider: 'v8',
++      include: [
++        'src/app/login/login.component.ts',
++        'src/app/dashboard/dashboard.component.ts',
++        'src/app/utils/legacy-format.ts'
++      ],
++      thresholds: {
++        perFile: true,
++        lines: 85,
++        statements: 85,
++        functions: 85,
++        branches: 85
++      },
+       reporter: ['text', 'json-summary', 'html']
+     }
+   }
+diff --git "a/src\\app\\login\\login-flow.spec.ts" "b/src\\app\\login\\login-flow.spec.ts"
+new file mode 100644
+index 0000000..1ed347a
+--- /dev/null
++++ "b/src\\app\\login\\login-flow.spec.ts"
+@@ -0,0 +1,263 @@
++import '@angular/compiler';
++import 'zone.js';
++import { ChangeDetectorRef, NgZone } from '@angular/core';
++import { Router } from '@angular/router';
++import axios from 'axios';
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++import { DashboardComponent } from '../dashboard/dashboard.component';
++import { LoginComponent } from './login.component';
++
++vi.mock('axios', () => ({
++  default: { post: vi.fn(), get: vi.fn() }
++}));
++
++vi.mock('@angular/router', () => ({
++  Router: class {
++    navigate = vi.fn(async () => true);
++  }
++}));
++
++class MemoryStorage implements Storage {
++  private values = new Map<string, string>();
++  get length(): number { return this.values.size; }
++  clear(): void { this.values.clear(); }
++  getItem(key: string): string | null { return this.values.get(key) ?? null; }
++  key(index: number): string | null { return [...this.values.keys()][index] ?? null; }
++  removeItem(key: string): void { this.values.delete(key); }
++  setItem(key: string, value: string): void { this.values.set(key, String(value)); }
++}
++
++describe('login and tasks contract', () => {
++  const user = { username: 'student', displayName: 'Student' };
++  const router = new Router();
++  const navigate = vi.mocked(router.navigate);
++  const detectChanges = vi.fn();
++  const cdr: ChangeDetectorRef = {
++    detectChanges,
++    markForCheck: vi.fn(),
++    detach: vi.fn(),
++    checkNoChanges: vi.fn(),
++    reattach: vi.fn()
++  };
++  const zone = new NgZone({ enableLongStackTrace: false });
++  let storage: MemoryStorage;
++
++  function authenticatedDashboard(): DashboardComponent {
++    storage.setItem('workshop_token', 'test-token');
++    storage.setItem('workshop_user', JSON.stringify(user));
++    return new DashboardComponent(router, cdr, zone);
++  }
++
++  function validLogin(): LoginComponent {
++    const login = new LoginComponent(router);
++    login.username = user.username;
++    login.password = 'test-password';
++    return login;
++  }
++
++  beforeEach(() => {
++    vi.resetAllMocks();
++    storage = new MemoryStorage();
++    vi.stubGlobal('localStorage', storage);
++    navigate.mockResolvedValue(true);
++    vi.spyOn(console, 'error').mockImplementation(() => {});
++    vi.spyOn(console, 'log').mockImplementation(() => {});
++  });
++
++  afterEach(() => {
++    vi.restoreAllMocks();
++    vi.unstubAllGlobals();
++  });
++
++  it('logs in, loads tasks with the saved token and logs out preserving preferences', async () => {
++    const login = validLogin();
++    vi.mocked(axios.post).mockResolvedValue({ data: { token: 'test-token', user } });
++    await login.login();
++    expect(axios.post).toHaveBeenCalledExactlyOnceWith(
++      'http://localhost:8080/auth/login',
++      { username: 'student', password: 'test-password', client: 'angular-workshop' },
++      { timeout: 5000 }
++    );
++    expect(storage.getItem('workshop_token')).toBe('test-token');
++    expect(storage.getItem('workshop_user')).toBe(JSON.stringify(user));
++    expect(navigate).toHaveBeenLastCalledWith(['/dashboard']);
++    expect(login.busy).toBe(false);
++    const preferences = storage.getItem('workshop_preferences');
++    expect(preferences).not.toBeNull();
++
++    const tasks = [
++      { title: 'First', priority: 'A', owner: 'student', status: 'TODO' },
++      { title: 'Hidden', priority: 'Z', owner: 'student', status: 'ARCHIVED' },
++      { title: 'Second', priority: 'B', owner: 'trainer', status: 'DONE' }
++    ];
++    vi.mocked(axios.get).mockResolvedValue({ data: tasks });
++    const dashboard = new DashboardComponent(router, cdr, zone);
++    await dashboard.ngOnInit();
++    expect(axios.get).toHaveBeenCalledExactlyOnceWith(
++      'http://localhost:8000/api/tasks?owner=student',
++      { headers: { Authorization: 'Bearer test-token' } }
++    );
++    expect(dashboard.tasks).toHaveLength(3);
++    expect(dashboard.visibleTasks.map(task => task.title)).toEqual(['Second', 'First']);
++    expect(dashboard.visibleTasks.map(task => task.label)).toEqual(['B · TRAINER', 'A · STUDENT']);
++    expect(dashboard.loading).toBe(false);
++    expect(dashboard.error).toBe('');
++    expect(detectChanges).toHaveBeenCalledOnce();
++    await dashboard.logout();
++    expect(storage.getItem('workshop_token')).toBeNull();
++    expect(storage.getItem('workshop_user')).toBeNull();
++    expect(storage.getItem('workshop_preferences')).toBe(preferences);
++    expect(navigate).toHaveBeenLastCalledWith(['/login']);
++  });
++
++  it('persists before navigation, waits for tasks and logs out without additional HTTP', async () => {
++    navigate.mockImplementation(async commands => {
++      if (commands[0] === '/dashboard') {
++        expect(storage.getItem('workshop_token')).toBe('test-token');
++        expect(storage.getItem('workshop_user')).toBe(JSON.stringify(user));
++        expect(storage.getItem('workshop_preferences')).not.toBeNull();
++        expect(axios.get).not.toHaveBeenCalled();
++      }
++      return true;
++    });
++    vi.mocked(axios.post).mockResolvedValue({ data: { token: 'test-token', user } });
++    await validLogin().login();
++    let complete!: (response: { data: [] }) => void;
++    vi.mocked(axios.get).mockImplementation(() => {
++      expect(storage.getItem('workshop_token')).toBe('test-token');
++      return new Promise(resolve => { complete = resolve; });
++    });
++    const dashboard = new DashboardComponent(router, cdr, zone);
++    const pending = dashboard.ngOnInit();
++    expect(dashboard.loading).toBe(true);
++    expect(axios.get).toHaveBeenCalledWith(
++      'http://localhost:8000/api/tasks?owner=student',
++      { headers: { Authorization: 'Bearer test-token' } }
++    );
++    complete({ data: [] });
++    await pending;
++    expect(dashboard.loading).toBe(false);
++    await dashboard.logout();
++    expect(axios.post).toHaveBeenCalledOnce();
++    expect(axios.get).toHaveBeenCalledOnce();
++  });
++
++  it.each(['', '   ', null, undefined])('rejects empty username %s without HTTP', async username => {
++    const login = validLogin();
++    login.username = username;
++    await login.login();
++    expect(login.message).toContain('Ingrese un usuario.');
++    expect(login.busy).toBe(false);
++    expect(axios.post).not.toHaveBeenCalled();
++    expect(navigate).not.toHaveBeenCalled();
++  });
++
++  it.each(['', '   ', null, undefined])('rejects empty password %s without HTTP', async password => {
++    const login = validLogin();
++    login.password = password;
++    await login.login();
++    expect(login.message).toContain('Ingrese una contraseña.');
++    expect(axios.post).not.toHaveBeenCalled();
++    expect(navigate).not.toHaveBeenCalled();
++  });
++
++  it.each([{}, { token: '' }])('does not save or navigate when token is missing: %j', async data => {
++    const login = validLogin();
++    vi.mocked(axios.post).mockResolvedValue({ data });
++    await login.login();
++    expect(login.message).toContain('El backend respondió sin token.');
++    expect(storage.getItem('workshop_token')).toBeNull();
++    expect(login.busy).toBe(false);
++    expect(navigate).not.toHaveBeenCalled();
++  });
++
++  it('keeps loading active until login settles and sends untrimmed credentials', async () => {
++    let complete = (_response: { data: { token: string; user: typeof user } }): void => {};
++    vi.mocked(axios.post).mockReturnValue(new Promise(resolve => { complete = resolve; }));
++    const login = validLogin();
++    login.username = ' student ';
++    login.password = ' password ';
++    const pending = login.login();
++    expect(login.busy).toBe(true);
++    expect(axios.post).toHaveBeenCalledWith(
++      expect.any(String),
++      { username: ' student ', password: ' password ', client: 'angular-workshop' },
++      { timeout: 5000 }
++    );
++    complete({ data: { token: 'test-token', user } });
++    await pending;
++    expect(login.busy).toBe(false);
++  });
++
++  it.each([
++    ['backend down', { message: 'Network Error' }, 'Network Error'],
++    ['timeout', { code: 'ECONNABORTED', message: 'timeout of 5000ms exceeded' }, 'timeout of 5000ms exceeded'],
++    ['backend rejection', { response: { data: { message: 'Credenciales inválidas' } } }, 'Credenciales inválidas'],
++    ['unknown error', {}, 'Error desconocido']
++  ])('finishes login and reports %s without creating a session', async (_name, error, message) => {
++    vi.mocked(axios.post).mockRejectedValue(error);
++    const login = validLogin();
++    await login.login();
++    expect(login.message).toContain(message);
++    expect(login.busy).toBe(false);
++    expect(storage.getItem('workshop_token')).toBeNull();
++    expect(navigate).not.toHaveBeenCalled();
++    expect(console.error).toHaveBeenCalledWith(error);
++  });
++
++  it('returns to login without requesting tasks when there is no token', async () => {
++    const dashboard = new DashboardComponent(router, cdr, zone);
++    await dashboard.ngOnInit();
++    expect(navigate).toHaveBeenCalledExactlyOnceWith(['/login']);
++    expect(axios.get).not.toHaveBeenCalled();
++  });
++
++  it('handles an empty task list and absent username', async () => {
++    storage.setItem('workshop_token', 'test-token');
++    vi.mocked(axios.get).mockResolvedValue({ data: [] });
++    const dashboard = new DashboardComponent(router, cdr, zone);
++    await dashboard.ngOnInit();
++    expect(axios.get).toHaveBeenCalledWith(
++      'http://localhost:8000/api/tasks?owner=',
++      { headers: { Authorization: 'Bearer test-token' } }
++    );
++    expect(dashboard.visibleTasks).toEqual([]);
++    expect(dashboard.loading).toBe(false);
++    expect(dashboard.error).toBe('');
++  });
++
++  it.each([
++    ['backend down', { message: 'Network Error' }, 'Network Error'],
++    ['invalid token', { response: { status: 401, data: { detail: 'Token inválido' } } }, 'Token inválido'],
++    ['forbidden', { response: { status: 403, data: { detail: 'Acceso denegado' } } }, 'Acceso denegado'],
++    ['timeout rejection', { code: 'ECONNABORTED', message: 'timeout exceeded' }, 'timeout exceeded'],
++    ['unknown error', {}, 'No se pudo cargar el dashboard']
++  ])('finishes task loading and reports %s', async (_name, error, message) => {
++    const dashboard = authenticatedDashboard();
++    vi.mocked(axios.get).mockRejectedValue(error);
++    await dashboard.ngOnInit();
++    expect(dashboard.error).toBe(message);
++    expect(dashboard.loading).toBe(false);
++    expect(detectChanges).toHaveBeenCalledOnce();
++    expect(navigate).not.toHaveBeenCalled();
++  });
++
++  it.each([
++    ['TODO', 'Por hacer'], ['IN_PROGRESS', 'En progreso'], ['DONE', 'Completado'],
++    ['RESUELTO', 'Resuelto'], ['COMPLETED', 'Completado'], ['todo', 'Por hacer'],
++    ['CUSTOM', 'CUSTOM'], ['', '']
++  ])('labels status %s as %s', (status, label) => {
++    expect(authenticatedDashboard().statusLabel(status)).toBe(label);
++  });
++
++  it('merges saved preferences with defaults', () => {
++    storage.setItem('workshop_preferences', JSON.stringify({ compact: true }));
++    expect(validLogin().preferences).toEqual({ theme: 'light', showTips: true, compact: true });
++  });
++
++  it('reports corrupt preferences while retaining defaults', () => {
++    storage.setItem('workshop_preferences', '{');
++    expect(validLogin().preferences).toEqual({ theme: 'light', showTips: true, compact: false });
++    expect(console.log).toHaveBeenCalledWith('Preferences could not be loaded', expect.any(SyntaxError));
++  });
++});
+diff --git "a/docs\\TESTING.md" "b/docs\\TESTING.md"
+new file mode 100644
+index 0000000..d8f4225
+--- /dev/null
++++ "b/docs\\TESTING.md"
+@@ -0,0 +1,162 @@
++# Pruebas de login y consulta de tareas
++
++## Alcance real
++
++Ejecución: 2026-10-19, rama `day1/prompting`, exclusivamente en este repositorio.
++
++El código inspeccionado sigue teniendo HTTP y sesión dentro de los componentes; no se presupone que el refactor del plan esté implementado. Se agregaron pruebas del flujo actual, sin modificar código de producción, contratos HTTP ni dependencias.
++
++Se usa Vitest en Node, Axios simulado, almacenamiento en memoria por caso, router simulado, un doble completo de `ChangeDetectorRef` y `NgZone` real. No se hacen peticiones a servicios externos. El camino feliz conecta las dos clases mediante la sesión guardada: no es una prueba E2E de navegador ni demuestra renderizado o accesibilidad.
++
++## Matriz de casos implementados
++
++Todas las filas de esta tabla están cubiertas por la ejecución final aprobada. Las variantes parametrizadas cuentan como pruebas individuales.
++
++| flujo | caso | tipo | resultado esperado |
++|---|---|---|---|
++| Login → tareas → logout | Login válido y arreglo con tareas visibles/archivadas | Camino feliz | POST exacto con timeout 5000 ms; guardar token/usuario/preferencias; navegar; GET con owner y Bearer guardado; filtrar ARCHIVED, etiquetar y ordenar; salir elimina sesión y conserva preferencias |
++| Login | Usuario vacío, blanco, null o undefined | Borde | Mensaje de usuario requerido; sin HTTP ni navegación |
++| Login | Contraseña vacía, blanca, null o undefined | Borde | Mensaje de contraseña requerida; sin HTTP ni navegación |
++| Login | Respuesta sin token o con token vacío | Borde | Mensaje de falta de token; sin sesión ni navegación; finaliza busy |
++| Login | Promesa aún pendiente y credenciales con espacios | Borde | busy permanece activo hasta resolver; credenciales enviadas sin recortar |
++| Login | Backend caído: rechazo con Network Error | Error | Mostrar error según el contrato actual, registrar fallo, terminar busy, no guardar sesión ni navegar |
++| Login | Timeout: rechazo ECONNABORTED | Error | Mostrar mensaje de timeout, terminar busy, no crear sesión; el request incluye timeout 5000 |
++| Login | Rechazo del backend con message | Error | Mostrar mensaje, registrar fallo, terminar busy, no crear sesión |
++| Login | Error sin message ni respuesta | Error | Mensaje por defecto Error desconocido; terminar busy |
++| Tareas | Sin token | Borde | Navegar a login y no llamar GET |
++| Tareas | Arreglo vacío y usuario ausente | Borde | Consultar owner vacío; lista visible vacía, sin error, carga terminada |
++| Tareas | Backend caído: rechazo con Network Error | Error | error contiene mensaje, loading false, solicita actualización de vista |
++| Tareas | Token inválido: rechazo HTTP 401 con detail | Error | Mostrar detail y finalizar carga; no redirigir automáticamente, según el contrato actual |
++| Tareas | Rechazo HTTP 403 con detail | Error | Mostrar detail y finalizar carga; no navegar |
++| Tareas | Rechazo de timeout simulado | Error | Mostrar mensaje de la excepción y finalizar carga |
++| Tareas | Error sin detail ni message | Error | Mensaje por defecto de dashboard, carga terminada |
++| Tareas | Estados TODO, IN_PROGRESS, DONE, RESUELTO, COMPLETED, minúsculas, desconocido y vacío | Borde | Traducción documentada o estado original cuando no hay equivalencia |
++| Preferencias | Valor parcial guardado | Borde | Combinar compact con los defaults existentes |
++| Preferencias | JSON corrupto | Error | Registrar el error y conservar preferencias por defecto |
++| Etiqueta | Prioridad y responsable presentes | Camino feliz | Texto en mayúsculas |
++| Etiqueta | Tarea null/undefined, campos ausentes o valores numéricos | Borde | Defaults documentados o conversión a texto |
++
++### Precisión sobre errores HTTP
++
++[ENDPOINTS.md](./ENDPOINTS.md) documenta un timeout configurado de 5000 ms para login, errores genéricos para ambas llamadas y ausencia de tratamiento especial de 401/403 en tareas. No define códigos propios para caída de red ni promete un timeout del GET.
++
++Los rechazos Network Error, ECONNABORTED y HTTP 401/403 son entradas simuladas al manejo de errores ya documentado, no respuestas reales verificadas de los servidores. El test de timeout de tareas demuestra únicamente el tratamiento de una excepción rechazada: **el GET actual no configura timeout**. No demuestra cancelación de una conexión colgada, temporización real ni validez criptográfica de un token.
++
++## Código de las pruebas
++
++Código completo ejecutado:
++
++- [login-flow.spec.ts](../src/app/login/login-flow.spec.ts): 33 pruebas de clases y flujo integrado por almacenamiento.
++- [legacy-format.spec.ts](../src/app/utils/legacy-format.spec.ts): 5 pruebas de la utilidad.
++- [vitest.config.ts](../vitest.config.ts): medición explícita de ambos componentes y la utilidad, con mínimo 85% por archivo en líneas, sentencias, funciones y ramas.
++
++Extractos del código ejecutado, sin duplicar los fixtures completos:
++
++```typescript
++// Camino feliz: el GET usa la sesión creada por login.
++await login.login();
++expect(storage.getItem('workshop_token')).toBe('test-token');
++const dashboard = new DashboardComponent(router, cdr, zone);
++await dashboard.ngOnInit();
++expect(axios.get).toHaveBeenCalledExactlyOnceWith(
++  'http://localhost:8000/api/tasks?owner=student',
++  { headers: { Authorization: 'Bearer test-token' } }
++);
++expect(dashboard.visibleTasks.map(task => task.title)).toEqual(['Second', 'First']);
++```
++
++```typescript
++// Borde: token ausente.
++vi.mocked(axios.post).mockResolvedValue({ data });
++await login.login();
++expect(login.message).toContain('El backend respondió sin token.');
++expect(storage.getItem('workshop_token')).toBeNull();
++expect(login.busy).toBe(false);
++expect(navigate).not.toHaveBeenCalled();
++```
++
++```typescript
++// Errores parametrizados de tareas: caída, 401, 403, timeout y desconocido.
++vi.mocked(axios.get).mockRejectedValue(error);
++await dashboard.ngOnInit();
++expect(dashboard.error).toBe(message);
++expect(dashboard.loading).toBe(false);
++expect(detectChanges).toHaveBeenCalledOnce();
++expect(navigate).not.toHaveBeenCalled();
++```
++
++Los casos de mensajes actuales caracterizan lo descrito en el contrato; no certifican que exponer mensajes internos o usar HTML sea seguro. H-01/H-02/H-06 siguen abiertos. No se añadieron pruebas que exijan que se mantengan defectos como el fallo ante JSON de usuario corrupto.
++
++## Comandos y resultados realmente ejecutados
++
++Directorio para todos los comandos:
++
++```powershell
++Set-Location 'C:\Users\Usuario\Documents\T56628-junior-cabrera\reqflow-workspace\workshop-login-frontend'
++```
++
++| ejecución | comando o herramienta | código de salida | resultado real |
++|---|---|---|---|
++| Descubrimiento del editor | Herramienta runTests con ambos archivos y coverage | No proporcionado por la herramienta | No encontró tests; no se interpreta como suite aprobada |
++| Primera cobertura | npm run test:coverage | 1 | 33 tests aprobados, 1 suite falló por error de sintaxis en la prueba de utilidad |
++| Segunda cobertura | npm run test:coverage | 0 | 38 tests aprobados tras corregir sintaxis |
++| Primera comprobación estricta | Comando tsc indicado debajo | 2 | Dos conversiones de dobles parciales a Router y ChangeDetectorRef rechazadas; se sustituyeron por router simulado construible y doble completo |
++| Comprobación estricta final | Comando tsc indicado debajo | 0 | Sin errores |
++| Cobertura final tras corregir los dobles | npm run test:coverage | 0 | 2 archivos y 38 tests aprobados, sin omitidos ni fallos esperados |
++
++Comandos reproducibles:
++
++```powershell
++npm run test:coverage
++$LASTEXITCODE
++npx --no-install tsc --noEmit --strict --experimentalDecorators --moduleResolution bundler --module ES2022 --target ES2022 --skipLibCheck src\app\login\login-flow.spec.ts src\app\utils\legacy-format.spec.ts vitest.config.ts
++$LASTEXITCODE
++```
++
++### Cobertura final medida con V8
++
++| código de producción medido | sentencias | ramas | funciones | líneas |
++|---|---|---|---|---|
++| login.component.ts | 100% | 100% | 100% | 100% |
++| dashboard.component.ts | 100% | 95.45% | 100% | 100% |
++| legacy-format.ts | 100% | 100% | 100% | 100% |
++| Total | 100% | 97.91% | 100% | 100% |
++
++Cada archivo supera el 85% en las cuatro métricas. La rama no cubierta reportada pertenece al comparador de prioridades de dashboard, línea 54. El denominador incluye los tres archivos explícitamente, aunque alguno dejara de importarse desde los tests. No representa cobertura de toda la aplicación ni de plantillas: rutas, arranque y HTML no están en esa medición. No hubo modificaciones de producción; se mide el código al que se agregaron pruebas.
++
++El informe se regeneró en `coverage/`; no se reutilizaron números de ejecuciones antiguas. El editor también informó ausencia de diagnósticos en los tres archivos editados al consultarlo; la comprobación estricta posterior es la evidencia final de tipado.
++
++## Fallos, bugs y pendientes separados
++
++### Fallos de herramientas corregidos
++
++El error de sintaxis de la prueba y las conversiones incompletas de los dobles se corrigieron en tests, sin tocar producción ni debilitar el compilador. La ejecución final tiene cero pruebas fallidas, omitidas o marcadas como fallo esperado. El descubrimiento del editor sigue sin estar configurado; se validó con el runner del repositorio.
++
++### Bug preexistente observado por inspección
++
++En [dashboard.component.ts:37](../src/app/dashboard/dashboard.component.ts#L37), `JSON.parse(workshop_user)` está fuera del `try` y antes del control de token. Si contiene JSON corrupto, la inicialización puede rechazar su promesa antes de mostrar error o redirigir. **No se corrigió ni se escribió un test que espere ese rechazo como resultado correcto.**
++
++Prueba de regresión propuesta, aún no implementada: con JSON corrupto, la inicialización debe recuperar una sesión coherente o mostrar un error controlado, sin una promesa rechazada sin tratar; primero debe acordarse la política de recuperación. No afirmar que ese caso ya pasa por tener cobertura alta.
++
++### Pendientes y pruebas propuestas
++
++- Verificación real de plantilla, teclado, anuncios de errores, botón deshabilitado y actualización después de navegar: requiere navegador; no está cubierta por los dobles.
++- Disponibilidad real, CORS, validación del token del servidor y temporización de red: no ejecutados; sin acceso a otros componentes.
++- Respuestas de tareas con esquema inválido y sesión inválida: definir política explícita antes de añadir expectativas nuevas; el contrato actual no valida esos esquemas.
++- La cobertura y los casos de clases mejoran H-04, pero no certifican accesibilidad ni cierre de todos los criterios del plan. El seguimiento permanece en [HALLAZGOS.md](../HALLAZGOS.md).
++- No se ejecutó build ni auditoría de dependencias en esta tarea; no hubo cambios de producción o manifiesto. No se instalaron paquetes.
++
++## Documentos consultados
++
++[ENDPOINTS.md](./ENDPOINTS.md), [REGLAS.md](../REGLAS.md), [GOOD_PRACTICES.md](./GOOD_PRACTICES.md), [HALLAZGOS.md](../HALLAZGOS.md) y [PLAN.md](../PLAN.md). Los contratos y estados de los hallazgos no se alteraron.
++
++## Implementación aprobada: H-04 (2026-10-19)
++
++- Antes: `npm run test:coverage`, salida 0, 38 tests verdes.
++- Después: mismo comando, salida 0, 39 tests verdes; líneas/sentencias/funciones 100%, ramas 97.87% global y mínimo 95% por archivo.
++- Se añadió el caso `persists before navigation, waits for tasks and logs out without additional HTTP`: observa sesión dentro del callback de navegación, token antes del GET, carga pendiente y una sola llamada POST/GET después de logout.
++- Navegador integrado en `http://localhost:4200`, sin acceder a otros repositorios: respuestas de ambos endpoints interceptadas mediante `page.route` con JSON y encabezados CORS `Access-Control-Allow-Origin/Headers/Methods: *`.
++- Éxito comprobado en DOM: saludo Browser Student, Visible task presente, Archived task ausente y logout vuelve a login. Segundo login con `[]`: texto de lista vacía visible. Tercer login con 401 y `detail`: error visible en dashboard, sin redirección; logout correcto.
++- Se observó el botón Ingresando deshabilitado mientras la respuesta estaba pendiente. Dos intentos de añadir demora mediante temporizador dentro del interceptor no completaron a tiempo y el POST fue abortado; esos intentos no se contabilizan como éxito de login. Los escenarios completos anteriores se ejecutaron sin temporizador en el interceptor. No se atribuye esa limitación de la simulación al backend.
++- Procedimiento reproducible: interceptar POST con token ficticio y usuario Browser Student, GET con tarea visible/ARCHIVED; introducir credenciales ficticias y comprobar DOM y logout; repetir GET con arreglo vacío y con HTTP 401/detail. Para observar botón pendiente, mantener pendiente la respuesta de POST y comprobar `disabled`, sin afirmar temporización real de red.
++- No se modificó producción. Se cerró H-04 antes de iniciar H-05. El patch de H-04 incluye el archivo de flujo completo por ser un archivo previamente no rastreado; sus 33 casos anteriores no se presentan como trabajo nuevo de esta etapa.
+diff --git a/HALLAZGOS.md b/HALLAZGOS.md
+new file mode 100644
+index 0000000..086903d
+--- /dev/null
++++ b/HALLAZGOS.md
+@@ -0,0 +1,18 @@
++# Hallazgos — Frontend Angular
++
++Matriz inicial de seguimiento de los seis casos de [RETO.md](./RETO.md), ordenada por severidad. Este es el único documento de seguimiento; las siguientes etapas deben actualizar estas mismas filas e identificadores.
++
++Revisión estática del código fuente actual. Las evidencias usan rutas relativas a esta carpeta y líneas verificadas al crear este documento. No se modificó código ni se ejecutaron pruebas, auditorías de dependencias o peticiones a servicios externos. No se usan los informes preexistentes de cobertura como evidencia de una ejecución actual.
++
++| id | hallazgo | tipo | explicacion | evidencia (archivo:linea) | severidad | estado |
++|---|---|---|---|---|---|---|
++| H-01 | Seguridad: token persistido en `localStorage` | Vulnerabilidad | Confirmado: el token se guarda y luego se lee desde almacenamiento accesible a JavaScript del mismo origen. Si un script malicioso logra ejecutarse en ese origen, puede extraerlo y reutilizarlo; además persiste entre recargas hasta su eliminación. No se ha demostrado una vía de ejecución maliciosa ni la duración del token del servidor. | [src/app/login/login.component.ts:47](./src/app/login/login.component.ts#L47); [src/app/dashboard/dashboard.component.ts:36](./src/app/dashboard/dashboard.component.ts#L36); [src/app/dashboard/dashboard.component.ts:44](./src/app/dashboard/dashboard.component.ts#L44); [src/app/dashboard/dashboard.component.ts:75](./src/app/dashboard/dashboard.component.ts#L75) | alta | Pendiente |
++| H-02 | Seguridad: mensaje dinámico renderizado con `[innerHTML]` | Vulnerabilidad | Confirmado: el usuario y el mensaje de error externo se concatenan como HTML. Contenido no confiable puede alterar la presentación del error. Angular sanitiza este enlace por defecto y aquí no se observa una omisión de esa protección; un XSS ejecutable es una hipótesis no demostrada, no un resultado de esta revisión. | [src/app/login/login.component.ts:55](./src/app/login/login.component.ts#L55); [src/app/login/login.component.ts:56](./src/app/login/login.component.ts#L56); [src/app/login/login.component.html:39](./src/app/login/login.component.html#L39) | media | Pendiente |
++| H-03 | Dependencias: `lodash 4.17.21` y `axios 0.31.0` declarados y utilizados | Sugerencia | Confirmadas las versiones declaradas y el uso de Axios para HTTP y de `lodash/merge` para preferencias locales. Se requiere contrastar avisos de seguridad, versiones efectivamente resueltas y rutas alcanzables antes de decidir actualizar o eliminar. No se atribuye ningún CVE ni vulnerabilidad explotable a estas versiones sin esa verificación; una dependencia afectada y alcanzable podría comprometer el procesamiento de datos o peticiones. | [package.json:19](./package.json#L19); [package.json:20](./package.json#L20); [src/app/login/login.component.ts:5](./src/app/login/login.component.ts#L5); [src/app/login/login.component.ts:25](./src/app/login/login.component.ts#L25); [src/app/dashboard/dashboard.component.ts:43](./src/app/dashboard/dashboard.component.ts#L43) | media | Pendiente |
++| H-04 | Testing: pruebas limitadas a una utilidad | Sugerencia | Resuelto con pruebas de flujo, orden de persistencia, carga pendiente y logout sin HTTP adicional; 39 pruebas verdes y cobertura por archivo >=85%. Navegador: éxito, lista vacía, error 401 y logout verificados; evidencia y límites en docs/TESTING.md, diff local artifacts/H-04.patch. | [src/app/login/login-flow.spec.ts](./src/app/login/login-flow.spec.ts); [vitest.config.ts](./vitest.config.ts); [docs/TESTING.md](./docs/TESTING.md); [artifacts/H-04.patch](./artifacts/H-04.patch) | media | Resuelto |
++| H-05 | Arquitectura: componentes conocen URLs, HTTP, sesión y navegación | Refactor | Confirmado: login autentica, persiste sesión y navega; dashboard recupera sesión, consulta HTTP, transforma tareas y cierra sesión. URLs y claves de almacenamiento están incrustadas en esos componentes. Cambiar el contrato o la sesión exige cambios coordinados y dificulta probar cada responsabilidad de manera aislada. | [src/app/login/login.component.ts:41](./src/app/login/login.component.ts#L41); [src/app/login/login.component.ts:47](./src/app/login/login.component.ts#L47); [src/app/login/login.component.ts:50](./src/app/login/login.component.ts#L50); [src/app/dashboard/dashboard.component.ts:36](./src/app/dashboard/dashboard.component.ts#L36); [src/app/dashboard/dashboard.component.ts:43](./src/app/dashboard/dashboard.component.ts#L43); [src/app/dashboard/dashboard.component.ts:74](./src/app/dashboard/dashboard.component.ts#L74) | baja | Pendiente |
++| H-06 | Calidad: `any`, condicionales anidados y patrones duplicados | Refactor | Confirmados `any` en estado, respuestas, errores y utilidad; validaciones anidadas en login; y claves de sesión repetidas al escribir, leer y borrar en ambos componentes. También se repite el patrón de extraer el mensaje de error con alternativas, aunque los contratos usan campos diferentes (`message` y `detail`): no son bloques idénticos. Se pierden comprobaciones de tipos y aumenta el riesgo de validaciones o cambios de sesión inconsistentes. | [src/app/login/login.component.ts:16](./src/app/login/login.component.ts#L16); [src/app/login/login.component.ts:33](./src/app/login/login.component.ts#L33); [src/app/login/login.component.ts:36](./src/app/login/login.component.ts#L36); [src/app/login/login.component.ts:47](./src/app/login/login.component.ts#L47); [src/app/login/login.component.ts:55](./src/app/login/login.component.ts#L55); [src/app/dashboard/dashboard.component.ts:23](./src/app/dashboard/dashboard.component.ts#L23); [src/app/dashboard/dashboard.component.ts:36](./src/app/dashboard/dashboard.component.ts#L36); [src/app/dashboard/dashboard.component.ts:67](./src/app/dashboard/dashboard.component.ts#L67); [src/app/dashboard/dashboard.component.ts:75](./src/app/dashboard/dashboard.component.ts#L75); [src/app/utils/legacy-format.ts:1](./src/app/utils/legacy-format.ts#L1) | baja | Pendiente |
++
++No hay casos completos de RETO marcados como **No encontrado**: los seis tienen evidencia. La aplicabilidad de CVEs y la explotación XSS permanecen sin confirmar y no se contabilizan como hechos demostrados.
++
++El mapa de componentes, dependencias y el flujo funcional observado se documentan en [docs/ENDPOINTS.md](./docs/ENDPOINTS.md), sin duplicar allí el seguimiento.
